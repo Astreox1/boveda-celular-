@@ -150,9 +150,10 @@
   }
   .brand{display:flex; align-items:center; gap:9px; flex:none; font-weight:500; font-size:15px; letter-spacing:-.01em}
   .search{
-    flex:1; max-width:320px; display:flex; align-items:center; gap:7px; margin-left:10px;
+    flex:1; min-width:36px; max-width:320px; display:flex; align-items:center; gap:7px; margin-left:10px;
     background:rgba(10,15,11,.45); border:1px solid var(--ln); border-radius:8px; padding:0 10px;
   }
+  .topbar-spacer{flex:1; min-width:0}
   .search input{flex:1; min-width:0; background:none; border:none; outline:none; color:var(--tx); font-size:13px; padding:8px 0}
   .search i{color:var(--ft); flex:none; font-size:15px}
 
@@ -289,6 +290,13 @@
     .back-to-list{display:inline-flex!important}
   }
   .back-to-list{display:none}
+  @media (max-width:480px){
+    .topbar{gap:7px; padding:0 8px}
+    .brand-word{display:none}
+    .btn-label{display:none}
+    .topbar .btn.sm{padding:8px; width:34px}
+    .search{margin-left:0}
+  }
 </style>
 </head>
 <body>
@@ -1203,15 +1211,15 @@ function renderApp(){
     <div class="wrap">
       <div class="topbar glass">
         <button class="icon-btn menu-btn" id="btn-menu" title="Menú"><i class="ph ph-list"></i></button>
-        <div class="brand">${LOGO_SVG(19)}<span>Bóveda</span></div>
+        <div class="brand">${LOGO_SVG(19)}<span class="brand-word">Bóveda</span></div>
         <div class="search">
           <i class="ph ph-magnifying-glass"></i>
           <input id="search" type="text" placeholder="Buscar cuenta, correo o nota…" value="${escapeAttr(state.search)}">
         </div>
-        <div style="flex:1"></div>
-        <button class="btn sm" id="btn-gen" title="Generador"><i class="ph ph-arrows-clockwise"></i>Generar</button>
-        <button class="btn sm" id="btn-set" title="Ajustes"><i class="ph ph-gear-six"></i>Ajustes</button>
-        <button class="btn sm primary" id="btn-lock"><i class="ph ph-lock-key"></i>Bloquear</button>
+        <div class="topbar-spacer"></div>
+        <button class="btn sm" id="btn-gen" title="Generador"><i class="ph ph-arrows-clockwise"></i><span class="btn-label">Generar</span></button>
+        <button class="btn sm" id="btn-set" title="Ajustes"><i class="ph ph-gear-six"></i><span class="btn-label">Ajustes</span></button>
+        <button class="btn sm primary" id="btn-lock" title="Bloquear"><i class="ph ph-lock-key"></i><span class="btn-label">Bloquear</span></button>
       </div>
       <div class="shell">
         <div class="sidebar glass" id="sidebar"></div>
