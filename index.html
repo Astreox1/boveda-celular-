@@ -1,0 +1,2429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bóveda — Gestor de contraseñas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#111a14">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bóveda">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+  :root{
+    --bg1:#1c3b2a; --bg2:#123028; --bg3:#111a14; --bg4:#0c110e; --bg5:#0a0e0b;
+    --tx:#e7ece8; --md:#b2bdb6; --ft:#939f97;
+    --ln:rgba(231,236,232,.14); --ln2:rgba(231,236,232,.24);
+    --ac:#4f9a70; --acl:#6bbd8c;             /* marca: borde y resplandor, nunca relleno plano */
+    --red:#e8796b; --amb:#e6b45f; --grn:#6fd49b;   /* solo para veredictos de fortaleza */
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    --sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+    --radius:10px; --radius-lg:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(820px 460px at 12% -12%, var(--bg1), transparent 68%),
+      radial-gradient(680px 560px at 104% 108%, var(--bg2), transparent 66%),
+      linear-gradient(160deg,var(--bg3),var(--bg4) 62%,var(--bg5));
+    background-attachment:fixed;
+    color:var(--tx); font-family:var(--sans); font-size:14px; line-height:1.55;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  body::after{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.42;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E");
+  }
+  .wrap{position:relative; z-index:2; height:100vh; display:flex; flex-direction:column}
+  button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+  input,textarea,select{font-family:inherit; font-size:14px}
+  i.ph, i.ph-fill{display:block; line-height:1}
+  ::selection{background:rgba(79,154,112,.32)}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:rgba(231,236,232,.18); border-radius:8px; border:2px solid transparent; background-clip:padding-box}
+  input::placeholder,textarea::placeholder{color:#75847a}
+  input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focus-visible{outline:2px solid var(--ac); outline-offset:2px}
+  a{color:var(--acl); text-underline-offset:3px}
+  a:hover{color:var(--ac)}
+  hr.fade{height:1px; border:0; background:linear-gradient(to right,transparent,var(--ln) 48px,var(--ln) calc(100% - 48px),transparent); margin:0}
+
+  /* ---- vidrio (base de paneles) ---- */
+  .glass{
+    background:rgba(30,38,32,.6); backdrop-filter:blur(22px) saturate(1.15); -webkit-backdrop-filter:blur(22px) saturate(1.15);
+    box-shadow:inset 0 1px 0 rgba(231,236,232,.07);
+  }
+  .card{
+    background:rgba(231,236,232,.05); border:1px solid rgba(231,236,232,.09);
+    border-radius:var(--radius); padding:13px 15px; box-shadow:inset 0 1px 0 rgba(231,236,232,.06);
+  }
+
+  /* ---- botones ---- */
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; justify-content:center;
+    padding:9px 13px; border-radius:8px; font-weight:500; font-size:13px;
+    border:1px solid var(--ln2); background:transparent; color:var(--tx);
+    transition:.14s ease; white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--ac); color:var(--acl)}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:rgba(79,154,112,.14); border-color:var(--ac); color:var(--acl)}
+  .btn.primary:hover{background:rgba(79,154,112,.24)}
+  .btn.danger:hover{border-color:var(--red); color:var(--red)}
+  .btn.sm{padding:7px 11px; font-size:12.5px; border-radius:8px}
+  .btn:disabled{opacity:.5; cursor:not-allowed; border-color:var(--ln2)!important; color:var(--ft)!important; background:transparent!important}
+  .icon-btn{
+    width:32px;height:32px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:8px; border:1px solid var(--ln); color:var(--md); font-size:15px; transition:.14s;
+  }
+  .icon-btn:hover{border-color:var(--ac); color:var(--acl)}
+  .icon-btn.danger:hover{border-color:var(--red); color:var(--red)}
+
+  /* ---- campos ---- */
+  .field{margin-bottom:14px}
+  .field label{display:block; font-size:11.5px; color:var(--ft); margin-bottom:6px}
+  .inp{
+    width:100%; padding:10px 12px; background:rgba(10,15,11,.5); color:var(--tx);
+    border:1px solid var(--ln); border-radius:8px; outline:none; transition:.14s;
+  }
+  .inp:focus{border-color:var(--ac)}
+  textarea.inp{resize:vertical; min-height:70px; line-height:1.55}
+  .inp-mono{font-family:var(--mono); font-size:12.5px}
+  .pw-row{display:flex; gap:7px}
+  .pw-row .inp{flex:1; min-width:0}
+
+  /* ---- meter de fortaleza ---- */
+  .meter{display:flex; gap:3px; margin-top:8px}
+  .meter span{height:4px; flex:1; border-radius:2px; background:rgba(231,236,232,.16); transition:.25s}
+  .meter-label{display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:11.5px}
+  .meter-label b{font-family:var(--mono); color:var(--md); font-feature-settings:'tnum'}
+
+  /* ---- chip ---- */
+  .chip{
+    padding:6px 12px; border:1px solid var(--ln2); border-radius:999px; background:transparent;
+    color:var(--md); font-size:12.5px; font-weight:500; cursor:pointer; user-select:none;
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+  .chip.on{border-color:var(--ac); background:rgba(79,154,112,.14); color:var(--acl)}
+
+  /* ---- check-line (2fa, confirmaciones) ---- */
+  .check-line{
+    display:flex; align-items:center; gap:10px; padding:10px 12px;
+    background:rgba(231,236,232,.045); border:1px solid var(--ln); border-radius:8px;
+    cursor:pointer; user-select:none;
+  }
+  .check-line.on{border-color:rgba(111,212,155,.4); background:rgba(111,212,155,.1)}
+  .check-line i{font-size:17px; color:var(--ft); flex:none}
+  .check-line.on i{color:var(--grn)}
+  .check-line span{font-size:13px; font-weight:500; color:var(--md)}
+  .check-line.on span{color:var(--tx)}
+
+  /* ---- pantallas centradas: crear / recuperación / bloqueo ---- */
+  .centered{flex:1; display:flex; align-items:center; justify-content:center; padding:24px; overflow-y:auto}
+  .auth-card{
+    width:100%; border-radius:var(--radius-lg); padding:28px 28px 24px;
+    box-shadow:inset 0 1px 0 rgba(231,236,232,.08), 0 24px 60px rgba(0,0,0,.5);
+  }
+  .auth-head{display:flex; align-items:center; gap:12px}
+  .auth-title{font-weight:500; font-size:18px; letter-spacing:-.01em}
+  .auth-sub{font-size:12.5px; color:var(--ft)}
+  .err{color:var(--red); font-size:11.5px; margin-top:8px; min-height:16px; display:flex; align-items:center; gap:6px}
+  .hint-box{
+    background:rgba(232,121,107,.09); border:1px solid rgba(232,121,107,.3);
+    border-radius:10px; padding:11px 13px; display:flex; gap:10px; font-size:12px; color:var(--md); line-height:1.55;
+  }
+  .hint-box.amber{background:rgba(230,180,95,.08); border-color:rgba(230,180,95,.28)}
+  .hint-box i{flex:none; margin-top:1px}
+
+  /* ---- topbar ---- */
+  .topbar{
+    flex:none; display:flex; align-items:center; gap:12px; height:50px; padding:0 14px;
+    box-shadow:inset 0 -1px 0 rgba(231,236,232,.09), inset 0 1px 0 rgba(231,236,232,.06);
+  }
+  .brand{display:flex; align-items:center; gap:9px; flex:none; font-weight:500; font-size:15px; letter-spacing:-.01em}
+  .search{
+    flex:1; max-width:320px; display:flex; align-items:center; gap:7px; margin-left:10px;
+    background:rgba(10,15,11,.45); border:1px solid var(--ln); border-radius:8px; padding:0 10px;
+  }
+  .search input{flex:1; min-width:0; background:none; border:none; outline:none; color:var(--tx); font-size:13px; padding:8px 0}
+  .search i{color:var(--ft); flex:none; font-size:15px}
+
+  /* ---- shell de tres paneles ---- */
+  .shell{position:relative; flex:1; display:flex; min-height:0}
+  .sidebar{
+    width:204px; flex:none; display:flex; flex-direction:column; min-height:0;
+    box-shadow:inset -1px 0 0 rgba(231,236,232,.08);
+  }
+  .list-panel{
+    width:296px; flex:none; display:flex; flex-direction:column; min-height:0;
+    background:rgba(20,27,22,.34); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    box-shadow:inset -1px 0 0 rgba(231,236,232,.07);
+  }
+  .detail-pane{flex:1; min-width:0; overflow-y:auto; position:relative}
+
+  .health-card{margin:12px}
+  .sidebar-title{font-size:11px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:var(--ft); padding:6px 8px}
+  .sidebar-scroll{flex:1; overflow-y:auto; padding:0 8px 12px; min-height:0}
+  .view-row{
+    display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:8px; cursor:pointer;
+    margin-bottom:1px; color:var(--md);
+  }
+  .view-row:hover{background:rgba(231,236,232,.07)}
+  .view-row.on{background:rgba(79,154,112,.18); box-shadow:inset 0 0 0 1px rgba(107,189,140,.4); color:var(--tx)}
+  .view-row i{font-size:16px; flex:none; color:var(--ft)}
+  .view-row.on i{color:var(--acl)}
+  .view-row span.label{flex:1; min-width:0; font-size:13px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .view-row span.n{font-size:12px; color:var(--ft); font-feature-settings:'tnum'; flex:none}
+  .sidebar-foot{
+    padding:10px 14px; display:flex; align-items:center; gap:7px; color:var(--ft); font-size:11.5px;
+    flex:none; box-shadow:inset 0 1px 0 rgba(231,236,232,.08);
+  }
+  .sidebar-foot i{font-size:14px; flex:none}
+
+  .list-head{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 14px 10px; flex:none}
+  .list-head .title{font-weight:500; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .list-head .count{font-size:12px; color:var(--ft); font-feature-settings:'tnum'; white-space:nowrap; flex:none}
+  .list-scroll{flex:1; overflow-y:auto; min-height:0; padding:0 8px 8px}
+  .list-row{display:flex; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; margin-bottom:2px}
+  .list-row:hover{background:rgba(231,236,232,.07)}
+  .list-row.on{background:rgba(79,154,112,.18); box-shadow:inset 0 0 0 1px rgba(107,189,140,.4)}
+  .list-row-body{flex:1; min-width:0}
+  .list-row-top{display:flex; align-items:center; gap:6px}
+  .list-row-service{flex:1; min-width:0; font-weight:500; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .list-row-user{font-family:var(--mono); font-size:11.5px; color:var(--md); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .list-row-warn{display:flex; align-items:center; gap:5px; margin-top:4px; font-size:11.5px; overflow:hidden}
+  .list-row-warn span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .list-foot{padding:8px 12px 12px; flex:none; display:flex; gap:7px; box-shadow:inset 0 1px 0 rgba(231,236,232,.07)}
+
+  /* ---- baldosa de cuenta (avatar) ---- */
+  .tile{
+    flex:none; border-radius:9px; position:relative; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; background-size:cover; background-position:center;
+  }
+  .tile span{font-weight:600; position:relative; z-index:1}
+  .tile .fav-layer{position:absolute; inset:0; background-size:60%; background-position:center; background-repeat:no-repeat}
+
+  /* ---- detalle de una cuenta ---- */
+  .detail-body{padding:18px 22px 26px; max-width:452px}
+  .detail-head{display:flex; align-items:flex-start; gap:12px}
+  .detail-name{font-weight:500; font-size:21px; line-height:1.2; letter-spacing:-.015em}
+  .detail-url{font-family:var(--mono); font-size:11.5px; color:var(--md); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .verdict-card{margin-top:16px; padding:13px 15px; border-radius:var(--radius); background:rgba(231,236,232,.055); border:1px solid rgba(231,236,232,.09); box-shadow:inset 0 1px 0 rgba(231,236,232,.06)}
+  .field-list{margin-top:16px; background:rgba(231,236,232,.045); border:1px solid rgba(231,236,232,.08); border-radius:var(--radius); padding:4px 15px; box-shadow:inset 0 1px 0 rgba(231,236,232,.05)}
+  .field-row{display:flex; align-items:center; gap:10px; padding:11px 0}
+  .field-row.top{align-items:flex-start}
+  .field-row .k{width:88px; flex:none; font-size:12px; color:var(--ft)}
+  .field-row .v{flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .field-row .v.pre{white-space:pre-wrap; word-break:break-word; overflow:visible; text-overflow:clip; line-height:1.6; color:var(--md)}
+
+  /* ---- panel deslizante (generador / editor / historial / ajustes) ---- */
+  .side-panel{
+    position:absolute; inset:0; background:rgba(28,36,30,.78);
+    backdrop-filter:blur(28px) saturate(1.2); -webkit-backdrop-filter:blur(28px) saturate(1.2);
+    box-shadow:inset 1px 0 0 rgba(231,236,232,.12), -28px 0 60px rgba(0,0,0,.45);
+    display:flex; flex-direction:column; animation:panelIn .18s ease; z-index:5;
+  }
+  @keyframes panelIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+  .side-panel-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:16px 20px 12px; flex:none}
+  .side-panel-title{font-weight:500; font-size:17px; letter-spacing:-.01em}
+  .side-panel-body{flex:1; overflow-y:auto; padding:0 20px 16px; min-height:0}
+  .side-panel-foot{flex:none; display:flex; gap:7px; justify-content:flex-end; padding:12px 20px; box-shadow:inset 0 1px 0 rgba(231,236,232,.1)}
+
+  /* ---- onboarding (bóveda vacía) ---- */
+  .onboard-opt{
+    display:flex; align-items:flex-start; gap:12px; padding:14px; cursor:pointer;
+    background:rgba(231,236,232,.05); border:1px solid rgba(231,236,232,.09); border-radius:var(--radius);
+    box-shadow:inset 0 1px 0 rgba(231,236,232,.06);
+  }
+  .onboard-opt:hover{border-color:var(--ac)}
+  .onboard-opt i.lead{font-size:22px; color:var(--acl); flex:none; margin-top:1px}
+  .onboard-opt i.trail{font-size:16px; color:var(--ft); flex:none; margin-top:3px}
+  .empty-state{padding:30px 18px; text-align:center; color:var(--md)}
+  .empty-state i{font-size:26px; color:var(--ft); margin:0 auto 10px}
+
+  /* ---- toast ---- */
+  .toast-zone{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:200; display:flex; flex-direction:column; gap:8px; align-items:center}
+  .toast{
+    background:rgba(40,50,43,.9); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+    border:1px solid rgba(231,236,232,.16); border-radius:10px; padding:9px 14px;
+    display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:500;
+    box-shadow:0 12px 32px rgba(0,0,0,.55); animation:toastIn .2s ease; white-space:nowrap;
+  }
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .toast i{color:var(--grn); flex:none; font-size:16px}
+  .toast.warn i{color:var(--amb)}
+
+  /* ---- historial ---- */
+  .hist-item{display:flex; align-items:center; gap:9px; padding:11px 12px; background:rgba(231,236,232,.045); border:1px solid rgba(231,236,232,.08); border-radius:var(--radius); margin-bottom:8px}
+  .hist-main{flex:1; min-width:0}
+  .hist-pw{font-family:var(--mono); font-size:12.5px; color:var(--md); letter-spacing:.12em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .hist-pw.shown{letter-spacing:0; color:var(--tx)}
+  .hist-date{font-size:11.5px; color:var(--ft); margin-top:3px}
+
+  .divider{height:1px; background:var(--ln); margin:16px 0}
+  .small-note{font-size:12px; color:var(--ft); line-height:1.55}
+  .section-label{font-size:11px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:var(--ft); margin:20px 0 9px}
+  .section-label:first-child{margin-top:0}
+  .danger-card{border:1px solid rgba(232,121,107,.26); background:rgba(232,121,107,.07); border-radius:var(--radius); padding:13px 15px}
+
+  /* ---- responsivo: la ventana real puede bajar hasta 460px de ancho ---- */
+  .menu-btn{display:none}
+  @media (max-width:860px){
+    .sidebar{position:absolute; top:0; bottom:0; left:0; z-index:20; transform:translateX(-100%); transition:transform .18s ease; box-shadow:2px 0 30px rgba(0,0,0,.4)}
+    .sidebar.open{transform:none}
+    .menu-btn{display:inline-flex}
+    .search{max-width:none}
+  }
+  @media (max-width:620px){
+    .list-panel{width:100%}
+    .list-panel.hide-narrow{display:none}
+    .detail-pane.hide-narrow{display:none}
+    .back-to-list{display:inline-flex!important}
+  }
+  .back-to-list{display:none}
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+<div class="toast-zone" id="toasts"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   BÓVEDA — gestor de contraseñas cifrado de un solo archivo
+   Cifrado: AES-GCM 256 · Clave derivada con PBKDF2-SHA256
+   Todo se cifra en el navegador. La clave maestra nunca se guarda.
+   ============================================================ */
+
+const STORAGE_KEY = 'boveda_pm_v1';
+const PBKDF2_ITER = 600000;
+const CLIP_CLEAR_MS = 20000;        // limpia el portapapeles tras copiar
+const DEFAULT_AUTOLOCK_MIN = 5;
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const $ = (id) => document.getElementById(id);
+
+/* ---------- estado en memoria ---------- */
+const state = {
+  key: null,            // CryptoKey — solo vive mientras la bóveda está abierta
+  meta: null,           // { version, salt, iterations }
+  entries: [],
+  settings: { autoLockMin: DEFAULT_AUTOLOCK_MIN, checkBreaches:false, useFavicons:false },
+  search: '',
+  view: 'todas',         // 'todas' | 'atencion' | 'repetidas' | 'sin2fa' | 'favoritas' | 'f:<carpeta>'
+  sel: null,             // id de la cuenta seleccionada en el panel de detalle
+  reveal: false,         // ¿la contraseña seleccionada está visible?
+  sidebarOpen: false,    // barra lateral en ventanas angostas
+  narrowView: null,      // 'list' | 'detail' — qué panel se ve en el teléfono
+  iconOk: {},            // dominio -> ¿el favicon cargó de verdad?
+};
+
+/* ====================  CRIPTOGRAFÍA  ==================== */
+function b64(buf){
+  const b = new Uint8Array(buf); let s = '';
+  for (let i=0;i<b.length;i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
+function unb64(str){
+  const bin = atob(str); const b = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) b[i] = bin.charCodeAt(i);
+  return b;
+}
+async function deriveKey(password, salt, iterations){
+  const base = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations, hash:'SHA-256' },
+    base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+  );
+}
+async function encryptObj(key, obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
+  return { iv:b64(iv), ct:b64(ct) };
+}
+async function decryptObj(key, payload){
+  const data = await crypto.subtle.decrypt(
+    { name:'AES-GCM', iv:unb64(payload.iv) }, key, unb64(payload.ct)
+  );
+  return JSON.parse(dec.decode(data));
+}
+
+/* ---------- aleatoriedad segura ---------- */
+function randInt(max){
+  const limit = Math.floor(0xFFFFFFFF / max) * max;
+  const a = new Uint32Array(1); let x;
+  do { crypto.getRandomValues(a); x = a[0]; } while (x >= limit);
+  return x % max;
+}
+function uid(){
+  return 'e' + Date.now().toString(36) + randInt(1e9).toString(36);
+}
+
+/* ====================  CÓDIGO DE RECUPERACIÓN (24 palabras)  ====================
+   Esquema de dos puertas: una llave de bóveda (VK) al azar cifra los datos, y dos
+   "sobres" — uno derivado de la clave maestra, otro de la frase — envuelven esa
+   misma VK. Cambiar la clave solo rehace su sobre; el código sigue sirviendo. */
+
+/* Lista oficial BIP-39 en español (2048 palabras, sin acentos, únicas por sus 4
+   primeras letras) — necesaria para que una palabra mal copiada se note. */
+const LISTA_BIP39 = [
+"ábaco","abdomen","abeja","abierto","abogado","abono","aborto","abrazo",
+"abrir","abuelo","abuso","acabar","academia","acceso","acción","aceite",
+"acelga","acento","aceptar","ácido","aclarar","acné","acoger","acoso",
+"activo","acto","actriz","actuar","acudir","acuerdo","acusar","adicto",
+"admitir","adoptar","adorno","aduana","adulto","aéreo","afectar","afición",
+"afinar","afirmar","ágil","agitar","agonía","agosto","agotar","agregar",
+"agrio","agua","agudo","águila","aguja","ahogo","ahorro","aire",
+"aislar","ajedrez","ajeno","ajuste","alacrán","alambre","alarma","alba",
+"álbum","alcalde","aldea","alegre","alejar","alerta","aleta","alfiler",
+"alga","algodón","aliado","aliento","alivio","alma","almeja","almíbar",
+"altar","alteza","altivo","alto","altura","alumno","alzar","amable",
+"amante","amapola","amargo","amasar","ámbar","ámbito","ameno","amigo",
+"amistad","amor","amparo","amplio","ancho","anciano","ancla","andar",
+"andén","anemia","ángulo","anillo","ánimo","anís","anotar","antena",
+"antiguo","antojo","anual","anular","anuncio","añadir","añejo","año",
+"apagar","aparato","apetito","apio","aplicar","apodo","aporte","apoyo",
+"aprender","aprobar","apuesta","apuro","arado","araña","arar","árbitro",
+"árbol","arbusto","archivo","arco","arder","ardilla","arduo","área",
+"árido","aries","armonía","arnés","aroma","arpa","arpón","arreglo",
+"arroz","arruga","arte","artista","asa","asado","asalto","ascenso",
+"asegurar","aseo","asesor","asiento","asilo","asistir","asno","asombro",
+"áspero","astilla","astro","astuto","asumir","asunto","atajo","ataque",
+"atar","atento","ateo","ático","atleta","átomo","atraer","atroz",
+"atún","audaz","audio","auge","aula","aumento","ausente","autor",
+"aval","avance","avaro","ave","avellana","avena","avestruz","avión",
+"aviso","ayer","ayuda","ayuno","azafrán","azar","azote","azúcar",
+"azufre","azul","baba","babor","bache","bahía","baile","bajar",
+"balanza","balcón","balde","bambú","banco","banda","baño","barba",
+"barco","barniz","barro","báscula","bastón","basura","batalla","batería",
+"batir","batuta","baúl","bazar","bebé","bebida","bello","besar",
+"beso","bestia","bicho","bien","bingo","blanco","bloque","blusa",
+"boa","bobina","bobo","boca","bocina","boda","bodega","boina",
+"bola","bolero","bolsa","bomba","bondad","bonito","bono","bonsái",
+"borde","borrar","bosque","bote","botín","bóveda","bozal","bravo",
+"brazo","brecha","breve","brillo","brinco","brisa","broca","broma",
+"bronce","brote","bruja","brusco","bruto","buceo","bucle","bueno",
+"buey","bufanda","bufón","búho","buitre","bulto","burbuja","burla",
+"burro","buscar","butaca","buzón","caballo","cabeza","cabina","cabra",
+"cacao","cadáver","cadena","caer","café","caída","caimán","caja",
+"cajón","cal","calamar","calcio","caldo","calidad","calle","calma",
+"calor","calvo","cama","cambio","camello","camino","campo","cáncer",
+"candil","canela","canguro","canica","canto","caña","cañón","caoba",
+"caos","capaz","capitán","capote","captar","capucha","cara","carbón",
+"cárcel","careta","carga","cariño","carne","carpeta","carro","carta",
+"casa","casco","casero","caspa","castor","catorce","catre","caudal",
+"causa","cazo","cebolla","ceder","cedro","celda","célebre","celoso",
+"célula","cemento","ceniza","centro","cerca","cerdo","cereza","cero",
+"cerrar","certeza","césped","cetro","chacal","chaleco","champú","chancla",
+"chapa","charla","chico","chiste","chivo","choque","choza","chuleta",
+"chupar","ciclón","ciego","cielo","cien","cierto","cifra","cigarro",
+"cima","cinco","cine","cinta","ciprés","circo","ciruela","cisne",
+"cita","ciudad","clamor","clan","claro","clase","clave","cliente",
+"clima","clínica","cobre","cocción","cochino","cocina","coco","código",
+"codo","cofre","coger","cohete","cojín","cojo","cola","colcha",
+"colegio","colgar","colina","collar","colmo","columna","combate","comer",
+"comida","cómodo","compra","conde","conejo","conga","conocer","consejo",
+"contar","copa","copia","corazón","corbata","corcho","cordón","corona",
+"correr","coser","cosmos","costa","cráneo","cráter","crear","crecer",
+"creído","crema","cría","crimen","cripta","crisis","cromo","crónica",
+"croqueta","crudo","cruz","cuadro","cuarto","cuatro","cubo","cubrir",
+"cuchara","cuello","cuento","cuerda","cuesta","cueva","cuidar","culebra",
+"culpa","culto","cumbre","cumplir","cuna","cuneta","cuota","cupón",
+"cúpula","curar","curioso","curso","curva","cutis","dama","danza",
+"dar","dardo","dátil","deber","débil","década","decir","dedo",
+"defensa","definir","dejar","delfín","delgado","delito","demora","denso",
+"dental","deporte","derecho","derrota","desayuno","deseo","desfile","desnudo",
+"destino","desvío","detalle","detener","deuda","día","diablo","diadema",
+"diamante","diana","diario","dibujo","dictar","diente","dieta","diez",
+"difícil","digno","dilema","diluir","dinero","directo","dirigir","disco",
+"diseño","disfraz","diva","divino","doble","doce","dolor","domingo",
+"don","donar","dorado","dormir","dorso","dos","dosis","dragón",
+"droga","ducha","duda","duelo","dueño","dulce","dúo","duque",
+"durar","dureza","duro","ébano","ebrio","echar","eco","ecuador",
+"edad","edición","edificio","editor","educar","efecto","eficaz","eje",
+"ejemplo","elefante","elegir","elemento","elevar","elipse","élite","elixir",
+"elogio","eludir","embudo","emitir","emoción","empate","empeño","empleo",
+"empresa","enano","encargo","enchufe","encía","enemigo","enero","enfado",
+"enfermo","engaño","enigma","enlace","enorme","enredo","ensayo","enseñar",
+"entero","entrar","envase","envío","época","equipo","erizo","escala",
+"escena","escolar","escribir","escudo","esencia","esfera","esfuerzo","espada",
+"espejo","espía","esposa","espuma","esquí","estar","este","estilo",
+"estufa","etapa","eterno","ética","etnia","evadir","evaluar","evento",
+"evitar","exacto","examen","exceso","excusa","exento","exigir","exilio",
+"existir","éxito","experto","explicar","exponer","extremo","fábrica","fábula",
+"fachada","fácil","factor","faena","faja","falda","fallo","falso",
+"faltar","fama","familia","famoso","faraón","farmacia","farol","farsa",
+"fase","fatiga","fauna","favor","fax","febrero","fecha","feliz",
+"feo","feria","feroz","fértil","fervor","festín","fiable","fianza",
+"fiar","fibra","ficción","ficha","fideo","fiebre","fiel","fiera",
+"fiesta","figura","fijar","fijo","fila","filete","filial","filtro",
+"fin","finca","fingir","finito","firma","flaco","flauta","flecha",
+"flor","flota","fluir","flujo","flúor","fobia","foca","fogata",
+"fogón","folio","folleto","fondo","forma","forro","fortuna","forzar",
+"fosa","foto","fracaso","frágil","franja","frase","fraude","freír",
+"freno","fresa","frío","frito","fruta","fuego","fuente","fuerza",
+"fuga","fumar","función","funda","furgón","furia","fusil","fútbol",
+"futuro","gacela","gafas","gaita","gajo","gala","galería","gallo",
+"gamba","ganar","gancho","ganga","ganso","garaje","garza","gasolina",
+"gastar","gato","gavilán","gemelo","gemir","gen","género","genio",
+"gente","geranio","gerente","germen","gesto","gigante","gimnasio","girar",
+"giro","glaciar","globo","gloria","gol","golfo","goloso","golpe",
+"goma","gordo","gorila","gorra","gota","goteo","gozar","grada",
+"gráfico","grano","grasa","gratis","grave","grieta","grillo","gripe",
+"gris","grito","grosor","grúa","grueso","grumo","grupo","guante",
+"guapo","guardia","guerra","guía","guiño","guion","guiso","guitarra",
+"gusano","gustar","haber","hábil","hablar","hacer","hacha","hada",
+"hallar","hamaca","harina","haz","hazaña","hebilla","hebra","hecho",
+"helado","helio","hembra","herir","hermano","héroe","hervir","hielo",
+"hierro","hígado","higiene","hijo","himno","historia","hocico","hogar",
+"hoguera","hoja","hombre","hongo","honor","honra","hora","hormiga",
+"horno","hostil","hoyo","hueco","huelga","huerta","hueso","huevo",
+"huida","huir","humano","húmedo","humilde","humo","hundir","huracán",
+"hurto","icono","ideal","idioma","ídolo","iglesia","iglú","igual",
+"ilegal","ilusión","imagen","imán","imitar","impar","imperio","imponer",
+"impulso","incapaz","índice","inerte","infiel","informe","ingenio","inicio",
+"inmenso","inmune","innato","insecto","instante","interés","íntimo","intuir",
+"inútil","invierno","ira","iris","ironía","isla","islote","jabalí",
+"jabón","jamón","jarabe","jardín","jarra","jaula","jazmín","jefe",
+"jeringa","jinete","jornada","joroba","joven","joya","juerga","jueves",
+"juez","jugador","jugo","juguete","juicio","junco","jungla","junio",
+"juntar","júpiter","jurar","justo","juvenil","juzgar","kilo","koala",
+"labio","lacio","lacra","lado","ladrón","lagarto","lágrima","laguna",
+"laico","lamer","lámina","lámpara","lana","lancha","langosta","lanza",
+"lápiz","largo","larva","lástima","lata","látex","latir","laurel",
+"lavar","lazo","leal","lección","leche","lector","leer","legión",
+"legumbre","lejano","lengua","lento","leña","león","leopardo","lesión",
+"letal","letra","leve","leyenda","libertad","libro","licor","líder",
+"lidiar","lienzo","liga","ligero","lima","límite","limón","limpio",
+"lince","lindo","línea","lingote","lino","linterna","líquido","liso",
+"lista","litera","litio","litro","llaga","llama","llanto","llave",
+"llegar","llenar","llevar","llorar","llover","lluvia","lobo","loción",
+"loco","locura","lógica","logro","lombriz","lomo","lonja","lote",
+"lucha","lucir","lugar","lujo","luna","lunes","lupa","lustro",
+"luto","luz","maceta","macho","madera","madre","maduro","maestro",
+"mafia","magia","mago","maíz","maldad","maleta","malla","malo",
+"mamá","mambo","mamut","manco","mando","manejar","manga","maniquí",
+"manjar","mano","manso","manta","mañana","mapa","máquina","mar",
+"marco","marea","marfil","margen","marido","mármol","marrón","martes",
+"marzo","masa","máscara","masivo","matar","materia","matiz","matriz",
+"máximo","mayor","mazorca","mecha","medalla","medio","médula","mejilla",
+"mejor","melena","melón","memoria","menor","mensaje","mente","menú",
+"mercado","merengue","mérito","mes","mesón","meta","meter","método",
+"metro","mezcla","miedo","miel","miembro","miga","mil","milagro",
+"militar","millón","mimo","mina","minero","mínimo","minuto","miope",
+"mirar","misa","miseria","misil","mismo","mitad","mito","mochila",
+"moción","moda","modelo","moho","mojar","molde","moler","molino",
+"momento","momia","monarca","moneda","monja","monto","moño","morada",
+"morder","moreno","morir","morro","morsa","mortal","mosca","mostrar",
+"motivo","mover","móvil","mozo","mucho","mudar","mueble","muela",
+"muerte","muestra","mugre","mujer","mula","muleta","multa","mundo",
+"muñeca","mural","muro","músculo","museo","musgo","música","muslo",
+"nácar","nación","nadar","naipe","naranja","nariz","narrar","nasal",
+"natal","nativo","natural","náusea","naval","nave","navidad","necio",
+"néctar","negar","negocio","negro","neón","nervio","neto","neutro",
+"nevar","nevera","nicho","nido","niebla","nieto","niñez","niño",
+"nítido","nivel","nobleza","noche","nómina","noria","norma","norte",
+"nota","noticia","novato","novela","novio","nube","nuca","núcleo",
+"nudillo","nudo","nuera","nueve","nuez","nulo","número","nutria",
+"oasis","obeso","obispo","objeto","obra","obrero","observar","obtener",
+"obvio","oca","ocaso","océano","ochenta","ocho","ocio","ocre",
+"octavo","octubre","oculto","ocupar","ocurrir","odiar","odio","odisea",
+"oeste","ofensa","oferta","oficio","ofrecer","ogro","oído","oír",
+"ojo","ola","oleada","olfato","olivo","olla","olmo","olor",
+"olvido","ombligo","onda","onza","opaco","opción","ópera","opinar",
+"oponer","optar","óptica","opuesto","oración","orador","oral","órbita",
+"orca","orden","oreja","órgano","orgía","orgullo","oriente","origen",
+"orilla","oro","orquesta","oruga","osadía","oscuro","osezno","oso",
+"ostra","otoño","otro","oveja","óvulo","óxido","oxígeno","oyente",
+"ozono","pacto","padre","paella","página","pago","país","pájaro",
+"palabra","palco","paleta","pálido","palma","paloma","palpar","pan",
+"panal","pánico","pantera","pañuelo","papá","papel","papilla","paquete",
+"parar","parcela","pared","parir","paro","párpado","parque","párrafo",
+"parte","pasar","paseo","pasión","paso","pasta","pata","patio",
+"patria","pausa","pauta","pavo","payaso","peatón","pecado","pecera",
+"pecho","pedal","pedir","pegar","peine","pelar","peldaño","pelea",
+"peligro","pellejo","pelo","peluca","pena","pensar","peñón","peón",
+"peor","pepino","pequeño","pera","percha","perder","pereza","perfil",
+"perico","perla","permiso","perro","persona","pesa","pesca","pésimo",
+"pestaña","pétalo","petróleo","pez","pezuña","picar","pichón","pie",
+"piedra","pierna","pieza","pijama","pilar","piloto","pimienta","pino",
+"pintor","pinza","piña","piojo","pipa","pirata","pisar","piscina",
+"piso","pista","pitón","pizca","placa","plan","plata","playa",
+"plaza","pleito","pleno","plomo","pluma","plural","pobre","poco",
+"poder","podio","poema","poesía","poeta","polen","policía","pollo",
+"polvo","pomada","pomelo","pomo","pompa","poner","porción","portal",
+"posada","poseer","posible","poste","potencia","potro","pozo","prado",
+"precoz","pregunta","premio","prensa","preso","previo","primo","príncipe",
+"prisión","privar","proa","probar","proceso","producto","proeza","profesor",
+"programa","prole","promesa","pronto","propio","próximo","prueba","público",
+"puchero","pudor","pueblo","puerta","puesto","pulga","pulir","pulmón",
+"pulpo","pulso","puma","punto","puñal","puño","pupa","pupila",
+"puré","quedar","queja","quemar","querer","queso","quieto","química",
+"quince","quitar","rábano","rabia","rabo","ración","radical","raíz",
+"rama","rampa","rancho","rango","rapaz","rápido","rapto","rasgo",
+"raspa","rato","rayo","raza","razón","reacción","realidad","rebaño",
+"rebote","recaer","receta","rechazo","recoger","recreo","recto","recurso",
+"red","redondo","reducir","reflejo","reforma","refrán","refugio","regalo",
+"regir","regla","regreso","rehén","reino","reír","reja","relato",
+"relevo","relieve","relleno","reloj","remar","remedio","remo","rencor",
+"rendir","renta","reparto","repetir","reposo","reptil","res","rescate",
+"resina","respeto","resto","resumen","retiro","retorno","retrato","reunir",
+"revés","revista","rey","rezar","rico","riego","rienda","riesgo",
+"rifa","rígido","rigor","rincón","riñón","río","riqueza","risa",
+"ritmo","rito","rizo","roble","roce","rociar","rodar","rodeo",
+"rodilla","roer","rojizo","rojo","romero","romper","ron","ronco",
+"ronda","ropa","ropero","rosa","rosca","rostro","rotar","rubí",
+"rubor","rudo","rueda","rugir","ruido","ruina","ruleta","rulo",
+"rumbo","rumor","ruptura","ruta","rutina","sábado","saber","sabio",
+"sable","sacar","sagaz","sagrado","sala","saldo","salero","salir",
+"salmón","salón","salsa","salto","salud","salvar","samba","sanción",
+"sandía","sanear","sangre","sanidad","sano","santo","sapo","saque",
+"sardina","sartén","sastre","satán","sauna","saxofón","sección","seco",
+"secreto","secta","sed","seguir","seis","sello","selva","semana",
+"semilla","senda","sensor","señal","señor","separar","sepia","sequía",
+"ser","serie","sermón","servir","sesenta","sesión","seta","setenta",
+"severo","sexo","sexto","sidra","siesta","siete","siglo","signo",
+"sílaba","silbar","silencio","silla","símbolo","simio","sirena","sistema",
+"sitio","situar","sobre","socio","sodio","sol","solapa","soldado",
+"soledad","sólido","soltar","solución","sombra","sondeo","sonido","sonoro",
+"sonrisa","sopa","soplar","soporte","sordo","sorpresa","sorteo","sostén",
+"sótano","suave","subir","suceso","sudor","suegra","suelo","sueño",
+"suerte","sufrir","sujeto","sultán","sumar","superar","suplir","suponer",
+"supremo","sur","surco","sureño","surgir","susto","sutil","tabaco",
+"tabique","tabla","tabú","taco","tacto","tajo","talar","talco",
+"talento","talla","talón","tamaño","tambor","tango","tanque","tapa",
+"tapete","tapia","tapón","taquilla","tarde","tarea","tarifa","tarjeta",
+"tarot","tarro","tarta","tatuaje","tauro","taza","tazón","teatro",
+"techo","tecla","técnica","tejado","tejer","tejido","tela","teléfono",
+"tema","temor","templo","tenaz","tender","tener","tenis","tenso",
+"teoría","terapia","terco","término","ternura","terror","tesis","tesoro",
+"testigo","tetera","texto","tez","tibio","tiburón","tiempo","tienda",
+"tierra","tieso","tigre","tijera","tilde","timbre","tímido","timo",
+"tinta","tío","típico","tipo","tira","tirón","titán","títere",
+"título","tiza","toalla","tobillo","tocar","tocino","todo","toga",
+"toldo","tomar","tono","tonto","topar","tope","toque","tórax",
+"torero","tormenta","torneo","toro","torpedo","torre","torso","tortuga",
+"tos","tosco","toser","tóxico","trabajo","tractor","traer","tráfico",
+"trago","traje","tramo","trance","trato","trauma","trazar","trébol",
+"tregua","treinta","tren","trepar","tres","tribu","trigo","tripa",
+"triste","triunfo","trofeo","trompa","tronco","tropa","trote","trozo",
+"truco","trueno","trufa","tubería","tubo","tuerto","tumba","tumor",
+"túnel","túnica","turbina","turismo","turno","tutor","ubicar","úlcera",
+"umbral","unidad","unir","universo","uno","untar","uña","urbano",
+"urbe","urgente","urna","usar","usuario","útil","utopía","uva",
+"vaca","vacío","vacuna","vagar","vago","vaina","vajilla","vale",
+"válido","valle","valor","válvula","vampiro","vara","variar","varón",
+"vaso","vecino","vector","vehículo","veinte","vejez","vela","velero",
+"veloz","vena","vencer","venda","veneno","vengar","venir","venta",
+"venus","ver","verano","verbo","verde","vereda","verja","verso",
+"verter","vía","viaje","vibrar","vicio","víctima","vida","vídeo",
+"vidrio","viejo","viernes","vigor","vil","villa","vinagre","vino",
+"viñedo","violín","viral","virgo","virtud","visor","víspera","vista",
+"vitamina","viudo","vivaz","vivero","vivir","vivo","volcán","volumen",
+"volver","voraz","votar","voto","voz","vuelo","vulgar","yacer",
+"yate","yegua","yema","yerno","yeso","yodo","yoga","yogur",
+"zafiro","zanja","zapato","zarza","zona","zorro","zumo","zurdo"
+];
+
+function nuevaFrase(){
+  const w = [];
+  for (let i = 0; i < 24; i++) w.push(LISTA_BIP39[randInt(LISTA_BIP39.length)]);
+  return w.join(' ');                       // 24 × 11 = 264 bits
+}
+/* para que "raíz", "RAIZ" y "  raiz " abran igual */
+function normaliza(frase){
+  return frase.trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .split(/\s+/).join(' ');
+}
+
+/* crea la bóveda con el esquema de dos puertas y devuelve la frase — se muestra
+   UNA vez, no se guarda en ningún lado */
+async function crearBoveda(clave){
+  const vkBytes = crypto.getRandomValues(new Uint8Array(32));
+  const llave = await crypto.subtle.importKey('raw', vkBytes, 'AES-GCM', true, ['encrypt','decrypt']);
+  const frase = nuevaFrase();
+  const salclave = crypto.getRandomValues(new Uint8Array(16));
+  const salfrase = crypto.getRandomValues(new Uint8Array(16));
+  const KM = await deriveKey(clave, salclave, PBKDF2_ITER);
+  const KR = await deriveKey(normaliza(frase), salfrase, PBKDF2_ITER);
+  const bruta = b64(await crypto.subtle.exportKey('raw', llave));
+  const raw = {
+    version: 2, iterations: PBKDF2_ITER,
+    salclave: b64(salclave), sobreclave: await encryptObj(KM, bruta),
+    salfrase: b64(salfrase), sobrefrase: await encryptObj(KR, bruta),
+    vault: await encryptObj(llave, { entries: [], settings: { autoLockMin: DEFAULT_AUTOLOCK_MIN, checkBreaches:false } })
+  };
+  return { raw, frase, llave };
+}
+
+/* abre por clave o por frase, el mismo camino — y sigue leyendo bóvedas
+   version:1 (sin sobres) para no romper los respaldos que ya existen */
+async function abrir(secreto, via){                // via: 'clave' | 'frase'
+  const raw = await loadRaw();
+  if (!raw) throw new Error('no existe bóveda');
+  if ((raw.version||1) < 2){
+    if (via === 'frase') throw new Error('Esta bóveda es de un formato anterior y no tiene código de recuperación');
+    const salt = unb64(raw.salt);
+    const key = await deriveKey(secreto, salt, raw.iterations || PBKDF2_ITER);
+    const payload = await decryptObj(key, raw.vault);      // lanza si la clave es incorrecta
+    return { key, meta:{ version:1, salt:raw.salt, iterations:raw.iterations||PBKDF2_ITER }, payload };
+  }
+  const salt = unb64(via === 'clave' ? raw.salclave : raw.salfrase);
+  const sobre = via === 'clave' ? raw.sobreclave : raw.sobrefrase;
+  const K  = await deriveKey(via === 'clave' ? secreto : normaliza(secreto), salt, raw.iterations);
+  const vkB64 = await decryptObj(K, sobre);                // lanza si el secreto es incorrecto
+  const llave = await crypto.subtle.importKey('raw', unb64(vkB64), 'AES-GCM', false, ['encrypt','decrypt']);
+  const payload = await decryptObj(llave, raw.vault);
+  return { key: llave, meta:{ version:2, iterations: raw.iterations }, payload };
+}
+
+/* cambiar la clave maestra: solo se rehace el sobre de la clave — la bóveda no se
+   vuelve a cifrar, y el código de 24 palabras sigue sirviendo */
+async function cambiarClaveV2(vieja, nueva){
+  const raw = await loadRaw();
+  const VK = unb64(await decryptObj(await deriveKey(vieja, unb64(raw.salclave), raw.iterations), raw.sobreclave));
+  const salclave = crypto.getRandomValues(new Uint8Array(16));
+  raw.salclave = b64(salclave);
+  raw.sobreclave = await encryptObj(await deriveKey(nueva, salclave, PBKDF2_ITER), b64(VK));
+  await saveRaw(raw);
+}
+
+/* activa el código de 24 palabras en una bóveda version:1 (sin sobres): verifica la
+   clave actual, migra al esquema de dos puertas y re-cifra la bóveda bajo una VK
+   nueva. Devuelve la frase (una vez) y la llave que hay que usar de ahora en más. */
+async function activarRecuperacion(claveActual){
+  const raw = await loadRaw();
+  if ((raw.version||1) >= 2) throw new Error('esta bóveda ya tiene código de recuperación');
+  const K = await deriveKey(claveActual, unb64(raw.salt), raw.iterations || PBKDF2_ITER);
+  const payload = await decryptObj(K, raw.vault);        // lanza si la clave es incorrecta
+  const { raw: nuevoRaw, frase, llave } = await crearBoveda(claveActual);
+  nuevoRaw.vault = await encryptObj(llave, payload);      // conserva las cuentas ya guardadas
+  await saveRaw(nuevoRaw);
+  return { frase, llave, meta:{ version:2, iterations: nuevoRaw.iterations } };
+}
+
+/* reemplaza solo el sobre de la frase — el código anterior deja de servir, la
+   contraseña maestra y la bóveda cifrada no se tocan */
+async function regenerarFrase(claveActual){
+  const raw = await loadRaw();
+  const VK = unb64(await decryptObj(await deriveKey(claveActual, unb64(raw.salclave), raw.iterations), raw.sobreclave));
+  const frase = nuevaFrase();
+  const salfrase = crypto.getRandomValues(new Uint8Array(16));
+  raw.salfrase = b64(salfrase);
+  raw.sobrefrase = await encryptObj(await deriveKey(normaliza(frase), salfrase, raw.iterations), b64(VK));
+  await saveRaw(raw);
+  return frase;
+}
+
+/* ====================  ALMACENAMIENTO  ==================== */
+/* la versión de escritorio usa el preload.js de Electron; esta, al vivir en el
+   navegador del teléfono, guarda el mismo blob cifrado en localStorage — mismo
+   contrato get/set que ya usa el resto de la app, nada más cambia. */
+window.storage = {
+  get: async (key) => {
+    const v = localStorage.getItem(key);
+    return v == null ? null : { value: v };
+  },
+  set: async (key, value) => {
+    try { localStorage.setItem(key, value); return true; }
+    catch(e){ return false; }   // p.ej. cuota de almacenamiento llena
+  },
+};
+async function storageAvailable(){ return typeof window.storage !== 'undefined'; }
+
+async function loadRaw(){
+  try {
+    const r = await window.storage.get(STORAGE_KEY);
+    return r ? JSON.parse(r.value) : null;
+  } catch(e){ return null; }   // clave inexistente => bóveda nueva
+}
+async function saveRaw(obj){
+  const r = await window.storage.set(STORAGE_KEY, JSON.stringify(obj));
+  if (!r) throw new Error('No se pudo guardar');
+}
+
+/* persiste las entradas cifradas conservando la metadata. En version:2 los sobres
+   (salclave/sobreclave/salfrase/sobrefrase) ya están en disco — solo se reemplaza
+   el blob de la bóveda, nunca los sobres. */
+async function persist(){
+  const payload = { entries: state.entries, settings: state.settings };
+  const vault = await encryptObj(state.key, payload);
+  if (state.meta && state.meta.version === 2){
+    const raw = await loadRaw();
+    raw.vault = vault;
+    await saveRaw(raw);
+  } else {
+    await saveRaw({ version:1, salt:state.meta.salt, iterations:state.meta.iterations, vault });
+  }
+}
+
+/* ====================  GENERADOR  ==================== */
+const SETS = {
+  upper:'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  lower:'abcdefghijklmnopqrstuvwxyz',
+  digits:'0123456789',
+  symbols:'!@#$%^&*()-_=+[]{};:,.?'
+};
+const AMBIGUOUS = new Set("O0oIl1|`'\".,;:S5B8Z2");
+
+function buildPool(opts){
+  let parts = [];
+  for (const k of ['upper','lower','digits','symbols']){
+    if (opts[k]){
+      let s = SETS[k];
+      if (opts.avoidAmbiguous) s = [...s].filter(c => !AMBIGUOUS.has(c)).join('');
+      if (s.length) parts.push(s);
+    }
+  }
+  return parts;
+}
+function generatePassword(opts){
+  const parts = buildPool(opts);
+  if (!parts.length) return '';
+  const pool = parts.join('');
+  const len = Math.max(opts.length, parts.length);
+  const chars = [];
+  for (const s of parts) chars.push(s[randInt(s.length)]);   // al menos uno de cada tipo
+  while (chars.length < len) chars.push(pool[randInt(pool.length)]);
+  for (let i=chars.length-1;i>0;i--){                        // mezcla Fisher-Yates
+    const j = randInt(i+1);
+    [chars[i],chars[j]] = [chars[j],chars[i]];
+  }
+  return chars.join('');
+}
+function genEntropy(opts){
+  const parts = buildPool(opts);
+  if (!parts.length) return 0;
+  const pool = parts.join('').length;
+  return Math.round(Math.log2(pool) * opts.length);
+}
+/* estima la fuerza de una contraseña cualquiera */
+function estimateBits(pw){
+  if (!pw) return 0;
+  let pool = 0;
+  if (/[a-z]/.test(pw)) pool += 26;
+  if (/[A-Z]/.test(pw)) pool += 26;
+  if (/[0-9]/.test(pw)) pool += 10;
+  if (/[^a-zA-Z0-9]/.test(pw)) pool += 33;
+  return Math.round(Math.log2(pool || 1) * pw.length);
+}
+function strengthInfo(bits){
+  // rojo/ámbar/verde: el verde de marca (--ac) nunca se usa aquí, o un botón
+  // verde se leería como un veredicto de seguridad y el semáforo dejaría de servir.
+  if (bits < 40)  return { label:'Débil',     fill:1, color:'var(--red)' };
+  if (bits < 60)  return { label:'Aceptable', fill:2, color:'var(--amb)' };
+  if (bits < 90)  return { label:'Fuerte',    fill:3, color:'var(--grn)' };
+  return            { label:'Excelente',  fill:4, color:'var(--grn)' };
+}
+
+/* ====================  REPETIDAS, VIEJAS Y FILTRADAS  ==================== */
+/* repetidas — una pasada sobre todas las entradas */
+function repeticiones(entries){
+  const m = new Map();
+  for (const e of entries) if (e.password) m.set(e.password, (m.get(e.password) || 0) + 1);
+  return m;
+}
+/* viejas — a partir de e.updatedAt */
+const dias = ts => ts ? Math.floor((Date.now() - ts) / 86400000) : 0;
+
+/* filtradas — HIBP con k-anonimato: salen 5 caracteres del hash, nunca la contraseña */
+async function vecesFiltrada(pw){
+  const h = await crypto.subtle.digest('SHA-1', enc.encode(pw));
+  const hex = [...new Uint8Array(h)].map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+  const r = await fetch('https://api.pwnedpasswords.com/range/' + hex.slice(0,5));
+  const fila = (await r.text()).split('\n').find(l => l.startsWith(hex.slice(5)));
+  return fila ? parseInt(fila.split(':')[1], 10) : 0;
+}
+
+/* el veredicto — el orden es la decisión de diseño: una filtración gana sobre el largo,
+   el largo gana sobre la repetición, la repetición gana sobre la edad. Cada entrada
+   muestra un solo problema, el más urgente. */
+function veredicto(e, repes){
+  const bits = estimateBits(e.password || '');
+  if ((e.pwnedCount||0) > 0)   return { t:'Comprometida', c:'var(--red)' };
+  if (bits < 40)               return { t:'Débil',        c:'var(--red)' };
+  if (repes > 1)               return { t:'Repetida',     c:'var(--amb)' };
+  if (bits < 60)               return { t:'Mejorable',    c:'var(--amb)' };
+  if (dias(e.updatedAt) > 730) return { t:'Vieja',        c:'var(--amb)' };
+  return { t:'Fuerte', c:'var(--grn)' };
+}
+
+/* ====================  UTILIDADES UI  ==================== */
+function el(tag, cls, html){
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (html != null) n.innerHTML = html;
+  return n;
+}
+function toast(msg, kind='ok'){
+  const t = el('div', 'toast '+kind,
+    `<i class="ph-fill ${kind==='warn'?'ph-warning':'ph-check-circle'}"></i><span></span>`);
+  t.querySelector('span').textContent = msg;
+  $('toasts').appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='.3s'; setTimeout(()=>t.remove(),300); }, 2600);
+}
+async function copy(text, label){
+  try {
+    await navigator.clipboard.writeText(text);
+    toast((label||'Copiado') + ' · se borra en 20s', 'ok');
+    setTimeout(async ()=>{ try{
+      const cur = await navigator.clipboard.readText().catch(()=>null);
+      if (cur === text) await navigator.clipboard.writeText('');
+    }catch(e){} }, CLIP_CLEAR_MS);
+  } catch(e){ toast('No se pudo copiar (permiso del navegador)', 'warn'); }
+}
+/* íconos: <i class="ph ph-nombre"> (regular) o "ph-fill ph-nombre" (relleno) — Phosphor Icons */
+function mkIcon(iconClass, title, extra){
+  const b = el('button','icon-btn'+(extra?' '+extra:''), `<i class="${iconClass}"></i>`);
+  b.title = title;
+  return b;
+}
+
+/* ====================  PANTALLA DE BLOQUEO  ==================== */
+const LOGO_SVG = (w) => `<svg width="${w}" height="${w}" viewBox="0 0 120 120" fill="none" stroke="#6bbd8c" stroke-width="12" stroke-linejoin="miter" style="filter:drop-shadow(0 0 12px rgba(79,154,112,.5))"><path d="M18,22 L60,98 L102,22"></path><path d="M41,22 L60,58 L79,22"></path></svg>`;
+
+async function renderLock(){
+  clearAutoLock();
+  const exists = !!(await loadRaw());
+  const root = $('root');
+  let mode = 'clave';   // 'clave' | 'frase' — solo aplica cuando exists
+
+  root.innerHTML = `
+    <div class="wrap"><div class="centered"><div class="auth-card glass" style="max-width:392px">
+      <div class="auth-head">
+        ${LOGO_SVG(34)}
+        <div style="flex:1;min-width:0">
+          <div class="auth-title" style="font-size:19px">Bóveda</div>
+          <div class="auth-sub" style="white-space:nowrap">${exists ? 'Introduce tu clave maestra para abrir' : 'Crea tu clave maestra para empezar'}</div>
+        </div>
+      </div>
+      ${exists ? '' : `
+      <div class="hint-box amber" style="margin-top:20px">
+        <i class="ph-fill ph-warning" style="color:var(--amb);font-size:16px"></i>
+        <div>Esta clave cifra toda tu información. Al crear la bóveda recibirás también un código de recuperación de 24 palabras — guárdalo aparte: es la única otra puerta.</div>
+      </div>`}
+      <div id="lock-fields" style="margin-top:${exists?'24':'18'}px">
+        <div class="field">
+          <label>Clave maestra</label>
+          <div class="pw-row">
+            <input class="inp inp-mono" id="mpw" type="password" placeholder="••••••••••••" autocomplete="off">
+            <button class="icon-btn" id="mpw-eye" title="Mostrar"><i class="ph ph-eye"></i></button>
+          </div>
+          ${exists ? '' : '<div class="meter" id="mp-meter"><span></span><span></span><span></span><span></span></div><div class="meter-label"><span id="mp-lab" style="color:var(--ft)">—</span><b id="mp-bits"></b></div>'}
+        </div>
+        ${exists ? '' : `
+        <div class="field" style="margin-bottom:0">
+          <label>Confirmar clave maestra</label>
+          <input class="inp inp-mono" id="mpw2" type="password" placeholder="repite la clave" autocomplete="off">
+        </div>`}
+      </div>
+      <div class="err" id="lock-err"></div>
+      <button class="btn primary" id="lock-go" style="width:100%;padding:11px;margin-top:14px">
+        ${exists ? 'Abrir bóveda' : 'Crear bóveda'}
+      </button>
+      ${exists ? `
+      <hr class="fade" style="margin:18px 0 13px">
+      <div style="font-size:12px;color:var(--ft)">Olvidé la clave — <a href="#" id="use-alt">usar mi código de recuperación</a></div>` : `
+      <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--ft)">¿Ya tienes una bóveda? <a href="#" id="use-existing">Ábrela aquí</a></div>`}
+    </div></div></div>`;
+
+  function wireEnter(){
+    root.querySelectorAll('#lock-fields input, #lock-fields textarea').forEach(i =>
+      i.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); go(); } }));
+  }
+  function wireClaveMode(){
+    const mpw = $('mpw');
+    $('mpw-eye').onclick = () => {
+      const show = mpw.type === 'password';
+      mpw.type = show ? 'text' : 'password';
+      $('mpw-eye').innerHTML = `<i class="ph ${show?'ph-eye-slash':'ph-eye'}"></i>`;
+    };
+    if (!exists){
+      mpw.oninput = () => {
+        const bits = estimateBits(mpw.value);
+        const s = strengthInfo(bits);
+        const segs = $('mp-meter').children;
+        for (let i=0;i<4;i++) segs[i].style.background = i < s.fill ? s.color : 'rgba(231,236,232,.16)';
+        $('mp-lab').textContent = mpw.value ? s.label : '—';
+        $('mp-bits').textContent = mpw.value ? bits+' bits' : '';
+      };
+    }
+    wireEnter();
+    mpw.focus();
+  }
+  function setMode(next){
+    mode = next;
+    const fields = $('lock-fields');
+    const altLink = $('use-alt');
+    $('lock-err').textContent = '';
+    if (mode === 'frase'){
+      fields.innerHTML = `
+        <div class="field" style="margin-bottom:0">
+          <label>Código de recuperación (24 palabras)</label>
+          <textarea class="inp inp-mono" id="mfrase" rows="3" placeholder="palabra1 palabra2 palabra3 …" autocomplete="off" style="resize:vertical"></textarea>
+        </div>`;
+      $('lock-go').textContent = 'Abrir con código';
+      if (altLink) altLink.textContent = 'usar mi clave maestra en su lugar';
+      wireEnter();
+      $('mfrase').focus();
+    } else {
+      fields.innerHTML = `
+        <div class="field" style="margin-bottom:0">
+          <label>Clave maestra</label>
+          <div class="pw-row">
+            <input class="inp inp-mono" id="mpw" type="password" placeholder="••••••••••••" autocomplete="off">
+            <button class="icon-btn" id="mpw-eye" title="Mostrar"><i class="ph ph-eye"></i></button>
+          </div>
+        </div>`;
+      $('lock-go').textContent = 'Abrir bóveda';
+      if (altLink) altLink.textContent = 'usar mi código de recuperación';
+      wireClaveMode();
+    }
+  }
+  const go = () => !exists ? doCreate() : doUnlock(mode);
+  $('lock-go').onclick = go;
+  if (exists) $('use-alt').onclick = (e) => { e.preventDefault(); setMode(mode === 'frase' ? 'clave' : 'frase'); };
+  else $('use-existing').onclick = (e) => { e.preventDefault(); toast('Esta computadora no tiene otra bóveda guardada', 'warn'); };
+  wireClaveMode();
+}
+
+async function doUnlock(via){
+  const err = $('lock-err');
+  const goBtn = $('lock-go');
+  const original = goBtn.textContent;
+  const secreto = via === 'frase' ? $('mfrase').value.trim() : $('mpw').value;
+  err.textContent = '';
+  if (!secreto){ err.textContent = via === 'frase' ? 'Escribe tu código de recuperación' : 'Escribe tu clave maestra'; return; }
+  goBtn.disabled = true; goBtn.textContent = 'Descifrando…';
+  try {
+    const { key, meta, payload } = await abrir(secreto, via);
+    state.key = key;
+    state.meta = meta;
+    state.entries = Array.isArray(payload.entries) ? payload.entries : (Array.isArray(payload) ? payload : []);
+    state.settings = Object.assign({ autoLockMin: DEFAULT_AUTOLOCK_MIN, checkBreaches:false, useFavicons:false }, payload.settings || {});
+    renderApp();
+  } catch(e){
+    goBtn.disabled = false; goBtn.textContent = original;
+    const custom = e && (e.message === 'no existe bóveda' ||
+      e.message === 'Esta bóveda es de un formato anterior y no tiene código de recuperación');
+    err.innerHTML = '<i class="ph-fill ph-warning-circle"></i> ' + (custom ? e.message
+      : (via === 'frase' ? 'Código de recuperación incorrecto' : 'Clave maestra incorrecta'));
+  }
+}
+async function doCreate(){
+  const err = $('lock-err');
+  const pw = $('mpw').value, pw2 = $('mpw2').value;
+  err.textContent = '';
+  if (pw.length < 8){ err.textContent = 'Usa una clave de al menos 8 caracteres'; return; }
+  if (pw !== pw2){ err.innerHTML = '<i class="ph-fill ph-warning-circle"></i> Las claves no coinciden'; return; }
+  $('lock-go').disabled = true; $('lock-go').textContent = 'Cifrando…';
+  try {
+    const { raw, frase, llave } = await crearBoveda(pw);
+    await saveRaw(raw);
+    state.key = llave;
+    state.meta = { version:2, iterations: raw.iterations };
+    state.entries = [];
+    state.settings = { autoLockMin: DEFAULT_AUTOLOCK_MIN, checkBreaches:false, useFavicons:false };
+    renderRecoveryScreen(frase, () => { renderApp(); toast('Bóveda creada y cifrada', 'ok'); });
+  } catch(e){
+    $('lock-go').disabled = false; $('lock-go').textContent = 'Crear bóveda';
+    err.textContent = 'No se pudo crear la bóveda';
+  }
+}
+
+/* pantalla del código de 24 palabras — se muestra UNA vez, recién creada la bóveda */
+function renderRecoveryScreen(frase, onContinue){
+  clearAutoLock();
+  const root = $('root');
+  root.innerHTML = `
+    <div class="wrap"><div class="centered"><div class="auth-card glass" style="max-width:560px">
+      <div class="auth-head">
+        <i class="ph-fill ph-seal-check" style="font-size:26px;color:var(--acl);flex:none"></i>
+        <div style="flex:1;min-width:0">
+          <div class="auth-title">Tu código de recuperación</div>
+          <div class="auth-sub">24 palabras, en este orden. Es la única otra forma de entrar.</div>
+        </div>
+      </div>
+      <div id="rec-words" style="margin-top:18px;background:rgba(10,15,11,.5);border:1px solid var(--ln);border-radius:10px;padding:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px"></div>
+      <div style="display:flex;gap:7px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn sm" id="rec-copy"><i class="ph ph-copy"></i>Copiar</button>
+        <button class="btn sm" id="rec-txt"><i class="ph ph-download-simple"></i><span>Descargar .txt</span></button>
+        <button class="btn sm" id="rec-print"><i class="ph ph-printer"></i>Imprimir</button>
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:var(--md);line-height:1.6">Guárdalo en papel, fuera de esta computadora. Cualquiera que tenga estas 24 palabras abre tu bóveda completa.</div>
+      <div class="check-line" id="rec-confirm" style="margin-top:14px">
+        <i class="ph ph-circle"></i>
+        <span>Ya lo guardé en un lugar seguro</span>
+      </div>
+      <button class="btn primary" id="rec-go" style="width:100%;margin-top:14px;padding:11px" disabled>Entrar a mi bóveda</button>
+    </div></div></div>`;
+
+  const wordsBox = $('rec-words');
+  frase.split(' ').forEach((w,i) => {
+    wordsBox.appendChild(el('div', null,
+      `<span style="color:var(--ft);width:15px;display:inline-block;text-align:right;font-family:var(--mono);font-size:12.5px;font-feature-settings:'tnum'">${i+1}</span> <span style="font-family:var(--mono);font-size:12.5px">${escapeHtml(w)}</span>`));
+  });
+  $('rec-copy').onclick = () => copy(frase, 'Código copiado');
+  $('rec-txt').onclick = () => download('boveda-codigo-recuperacion.txt',
+    'BÓVEDA — código de recuperación\nGenerado el ' + formatDate(Date.now()) + '\n\n' + frase +
+    '\n\nGuarda este archivo en un lugar seguro, de preferencia fuera de esta computadora.\n', 'text/plain');
+  $('rec-print').onclick = () => window.print();
+  const confirmBox = $('rec-confirm');
+  const goBtn = $('rec-go');
+  confirmBox.onclick = () => {
+    const on = confirmBox.classList.toggle('on');
+    confirmBox.querySelector('i').className = on ? 'ph-fill ph-check-circle' : 'ph ph-circle';
+    goBtn.disabled = !on;
+  };
+  goBtn.onclick = () => { if (!goBtn.disabled) onContinue(); };
+}
+
+/* ====================  AUTO-BLOQUEO  ==================== */
+let autoLockTimer = null;
+let autoLockDeadline = Date.now();
+function resetAutoLock(){
+  clearTimeout(autoLockTimer);
+  const min = state.settings.autoLockMin;
+  if (!min || min <= 0) return;
+  autoLockDeadline = Date.now() + min*60*1000;
+  autoLockTimer = setTimeout(() => { lockNow(true); }, min*60*1000);
+}
+function clearAutoLock(){
+  clearTimeout(autoLockTimer);
+  ['mousedown','keydown','touchstart'].forEach(ev => document.removeEventListener(ev, resetAutoLock));
+}
+function armAutoLock(){
+  ['mousedown','keydown','touchstart'].forEach(ev => document.addEventListener(ev, resetAutoLock));
+  resetAutoLock();
+}
+function lockNow(auto){
+  state.key = null; state.entries = []; state.search = '';
+  closePanel();
+  renderLock();
+  if (auto) toast('Bóveda bloqueada por inactividad', 'warn');
+}
+
+/* ====================  ÍCONOS DE CUENTA  ==================== */
+const FOLDERS_SUGERIDAS = ['Banca','Trabajo','Compras','Ocio','Servicios'];
+const _friedDomains = {};    // dominios ya intentados esta sesión — no se repite el intento
+
+function hueOf(s){
+  let h = 0; for (let i=0;i<(s||'?').length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+function domainOf(url){
+  return (url||'').replace(/^https?:\/\//,'').split('/')[0];
+}
+/* baldosa base: color derivado del nombre, siempre disponible sin salir a internet */
+function tileOf(name){
+  const h = hueOf(name || '?');
+  return {
+    letter: (name||'?').trim().charAt(0).toUpperCase() || '?',
+    fg: 'oklch(0.80 0.075 '+h+')', bg: 'oklch(0.29 0.028 '+h+')', ring: 'oklch(0.42 0.038 '+h+')',
+  };
+}
+/* confirma que el favicon existe de verdad antes de taparle la letra a la baldosa —
+   nunca un <img> en el DOM, para que un dominio caído falle en silencio */
+function preloadFavicon(domain, onDone){
+  if (!domain || _friedDomains[domain]) return;
+  _friedDomains[domain] = true;
+  const img = new Image();
+  img.onload = () => { if (img.naturalWidth > 1){ state.iconOk[domain] = true; onDone && onDone(); } };
+  img.onerror = () => {};
+  img.src = 'https://icons.duckduckgo.com/ip3/' + domain + '.ico';
+}
+/* arma el estilo de la baldosa para una cuenta según su modo de ícono */
+function iconStyleFor(e, onLoaded){
+  const t = tileOf(e.service);
+  const mode = e.logoMode || 'auto';
+  if (mode === 'archivo' && e.logo){
+    return { fg:t.fg, bg:t.bg, ring:t.ring, letter:t.letter, bgImage:'url("'+e.logo+'")', plate:'#fff' };
+  }
+  if (mode === 'auto' && state.settings.useFavicons){
+    const d = domainOf(e.url);
+    if (d && state.iconOk[d] === true){
+      return { fg:t.fg, bg:t.bg, ring:t.ring, letter:t.letter, bgImage:'url("https://icons.duckduckgo.com/ip3/'+d+'.ico")', plate:t.bg };
+    }
+    if (d) preloadFavicon(d, onLoaded);
+  }
+  return { fg:t.fg, bg:t.bg, ring:t.ring, letter:t.letter, bgImage:'none', plate:'transparent' };
+}
+function buildTile(e, size, onLoaded){
+  const s = iconStyleFor(e, onLoaded);
+  const node = el('div','tile', `<span style="font-size:${Math.round(size*0.42)}px;color:${s.fg}">${escapeHtml(s.letter)}</span><div class="fav-layer"></div>`);
+  node.style.width = size+'px'; node.style.height = size+'px'; node.style.background = s.bg;
+  node.style.boxShadow = 'inset 0 0 0 1px '+s.ring;
+  const plate = node.querySelector('.fav-layer');
+  plate.style.backgroundColor = s.plate;
+  plate.style.backgroundImage = s.bgImage;
+  plate.style.backgroundSize = s.bgImage === 'none' ? '' : (s.plate === '#fff' ? 'contain' : Math.round(size*0.6)+'px');
+  plate.style.backgroundRepeat = 'no-repeat';
+  if (s.plate === '#fff') plate.style.padding = Math.round(size*0.14)+'px';
+  return node;
+}
+
+/* ====================  SALUD Y VISTAS  ==================== */
+function decoratedEntries(){
+  const repes = repeticiones(state.entries);
+  return state.entries.map(e => Object.assign({}, e, { _v: veredicto(e, repes.get(e.password) || 0) }));
+}
+function foldersInUse(){
+  const set = new Set();
+  state.entries.forEach(e => { if (e.folder) set.add(e.folder); });
+  return [...set].sort((a,b) => a.localeCompare(b,'es'));
+}
+function bucketsFor(all){
+  const weak = all.filter(e => e._v.c === 'var(--red)');
+  const mid = all.filter(e => e._v.c === 'var(--amb)');
+  const strong = all.filter(e => e._v.c === 'var(--grn)');
+  const notfa = all.filter(e => !e.has2FA);
+  const favd = all.filter(e => e.fav);
+  const dups = all.filter(e => e._v.t === 'Repetida' || (repeticiones(state.entries).get(e.password)||0) > 1);
+  const buckets = { todas: all, atencion: weak.concat(mid), repetidas: dups, sin2fa: notfa, favoritas: favd };
+  foldersInUse().forEach(f => { buckets['f:'+f] = all.filter(e => e.folder === f); });
+  return { buckets, weak, mid, strong, notfa, favd, dups };
+}
+
+/* ====================  APP PRINCIPAL  ==================== */
+function renderApp(){
+  armAutoLock();
+  if (!state.entries.some(e => e.id === state.sel)) state.sel = (state.entries[0]||{}).id || null;
+  state.narrowView = state.entries.length ? 'list' : 'detail';
+  $('root').innerHTML = `
+    <div class="wrap">
+      <div class="topbar glass">
+        <button class="icon-btn menu-btn" id="btn-menu" title="Menú"><i class="ph ph-list"></i></button>
+        <div class="brand">${LOGO_SVG(19)}<span>Bóveda</span></div>
+        <div class="search">
+          <i class="ph ph-magnifying-glass"></i>
+          <input id="search" type="text" placeholder="Buscar cuenta, correo o nota…" value="${escapeAttr(state.search)}">
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn sm" id="btn-gen" title="Generador"><i class="ph ph-arrows-clockwise"></i>Generar</button>
+        <button class="btn sm" id="btn-set" title="Ajustes"><i class="ph ph-gear-six"></i>Ajustes</button>
+        <button class="btn sm primary" id="btn-lock"><i class="ph ph-lock-key"></i>Bloquear</button>
+      </div>
+      <div class="shell">
+        <div class="sidebar glass" id="sidebar"></div>
+        <div class="list-panel" id="list-panel"></div>
+        <div class="detail-pane" id="detail-pane"></div>
+      </div>
+    </div>`;
+  $('search').oninput = (e) => { state.search = e.target.value; renderListPanel(); };
+  $('btn-gen').onclick = () => openGenerator();
+  $('btn-set').onclick = () => openSettings();
+  $('btn-lock').onclick = () => lockNow(false);
+  $('btn-menu').onclick = () => $('sidebar').classList.toggle('open');
+  renderSidebar();
+  renderListPanel();
+  renderDetailArea();
+}
+
+/* en ventanas angostas (el teléfono) solo se ve un panel a la vez — este decide
+   cuál, y se llama al final de cada render de lista/detalle para no depender
+   de que cada acción se acuerde de tocar las clases a mano */
+function applyNarrowVisibility(){
+  const list = $('list-panel'), detail = $('detail-pane');
+  if (!list || !detail) return;
+  const mode = state.narrowView || (state.entries.length ? 'list' : 'detail');
+  list.classList.toggle('hide-narrow', mode === 'detail');
+  detail.classList.toggle('hide-narrow', mode === 'list');
+}
+function selectEntry(id){
+  state.sel = id; state.reveal = false; state.narrowView = 'detail';
+  closePanel();
+  renderSidebar();
+  renderListPanel();
+  renderDetailArea();
+}
+function backToList(){
+  state.narrowView = 'list';
+  applyNarrowVisibility();
+}
+function setView(key){
+  state.view = key;
+  const all = decoratedEntries();
+  const { buckets } = bucketsFor(all);
+  const first = (buckets[key]||[])[0];
+  if (first) state.sel = first.id;
+  $('sidebar').classList.remove('open');
+  renderSidebar(); renderListPanel(); renderDetailArea();
+}
+
+function renderSidebar(){
+  const box = $('sidebar');
+  if (!box) return;
+  const all = decoratedEntries();
+  const empty = !all.length;
+  const { buckets, weak, mid, strong, notfa, favd, dups } = bucketsFor(all);
+
+  const total = all.length;
+  const score = empty ? '0 / 0' : strong.length + ' / ' + total;
+  const barColor = empty ? 'var(--ft)' : (weak.length ? 'var(--red)' : (mid.length ? 'var(--amb)' : 'var(--grn)'));
+  const line = empty ? 'Sin cuentas todavía. Empieza por la que más te importa.'
+    : (weak.length ? weak.length + (weak.length===1?' contraseña necesita':' contraseñas necesitan') + ' cambio hoy. Empieza por ahí.'
+      : 'Nada urgente. Revisa las repetidas cuando tengas un rato.');
+
+  const viewDef = [
+    ['todas','Todas', all.length, 'ph ph-vault'],
+    ['atencion','Necesitan atención', weak.length+mid.length, 'ph-fill ph-warning-circle'],
+    ['repetidas','Repetidas', dups.length, 'ph ph-copy-simple'],
+    ['sin2fa','Sin dos pasos', notfa.length, 'ph ph-shield-slash'],
+    ['favoritas','Favoritas', favd.length, 'ph ph-star'],
+  ];
+  const viewsHtml = viewDef.map(([key,label,n,icon]) => `
+    <div class="view-row${state.view===key?' on':''}" data-view="${key}">
+      <i class="${icon}"></i><span class="label">${label}</span><span class="n">${n}</span>
+    </div>`).join('');
+
+  const folders = foldersInUse();
+  const foldersHtml = folders.length ? `
+    <div class="sidebar-title">Colecciones</div>
+    ${folders.map(f => `
+      <div class="view-row${state.view==='f:'+f?' on':''}" data-view="f:${escapeAttr(f)}">
+        <i class="ph ph-folder-simple"></i><span class="label">${escapeHtml(f)}</span><span class="n">${buckets['f:'+f].length}</span>
+      </div>`).join('')}` : '';
+
+  box.innerHTML = `
+    <div class="health-card card">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+        <span style="font-size:12.5px;font-weight:500;color:var(--md)">Salud</span>
+        <span style="font-weight:500;font-size:15px;color:${barColor};font-feature-settings:'tnum'">${score}</span>
+      </div>
+      <div style="display:flex;gap:2px;margin-top:9px">
+        <div style="height:5px;border-radius:3px;background:var(--red);flex:${empty?1:Math.max(1,weak.length)}"></div>
+        <div style="height:5px;border-radius:3px;background:var(--amb);flex:${empty?1:Math.max(1,mid.length)}"></div>
+        <div style="height:5px;border-radius:3px;background:var(--grn);flex:${empty?1:Math.max(1,strong.length)}"></div>
+      </div>
+      <div style="font-size:11.5px;color:var(--md);margin-top:8px;line-height:1.5">${line}</div>
+    </div>
+    <div class="sidebar-scroll">
+      <div class="sidebar-title">Vistas</div>
+      ${viewsHtml}
+      ${foldersHtml}
+    </div>
+    <div class="sidebar-foot" id="autolock-foot"></div>`;
+  box.querySelectorAll('.view-row').forEach(row => row.onclick = () => setView(row.dataset.view));
+  renderAutoLockFoot();
+}
+
+let _autoLockFootTimer = null;
+function renderAutoLockFoot(){
+  clearInterval(_autoLockFootTimer);
+  const foot = $('autolock-foot');
+  if (!foot) return;
+  const paint = () => {
+    const min = state.settings.autoLockMin;
+    if (!min || min <= 0){ foot.innerHTML = '<i class="ph ph-lock-open"></i><span>Bloqueo automático apagado</span>'; return; }
+    const msLeft = Math.max(0, autoLockDeadline - Date.now());
+    const s = Math.ceil(msLeft/1000);
+    const mm = Math.floor(s/60), ss = String(s%60).padStart(2,'0');
+    foot.innerHTML = `<i class="ph ph-clock"></i><span style="font-feature-settings:'tnum'">Se bloquea en ${mm}:${ss}</span>`;
+  };
+  paint();
+  _autoLockFootTimer = setInterval(paint, 1000);
+}
+
+function renderListPanel(){
+  const box = $('list-panel');
+  if (!box) return;
+  const all = decoratedEntries();
+  const empty = !all.length;
+  const { buckets } = bucketsFor(all);
+  const titles = { todas:'Todas las cuentas', atencion:'Necesitan atención', repetidas:'Contraseñas repetidas', sin2fa:'Sin dos pasos', favoritas:'Favoritas' };
+  let items = empty ? [] : (buckets[state.view] || all).slice();
+  const q = state.search.trim().toLowerCase();
+  if (q) items = items.filter(e => (e.service+' '+e.username+' '+(e.url||'')+' '+(e.notes||'')).toLowerCase().includes(q));
+  items.sort((a,b) => (a.service||'').localeCompare(b.service||'', 'es', {sensitivity:'base'}));
+
+  box.innerHTML = `
+    <div class="list-head">
+      <span class="title">${titles[state.view] || state.view.replace('f:','')}</span>
+      <span class="count">${items.length}${items.length===1?' cuenta':' cuentas'}</span>
+    </div>
+    <div class="list-scroll" id="list-scroll"></div>
+    <div class="list-foot">
+      <button class="btn primary" id="btn-add" style="flex:1"><i class="ph ph-plus"></i>Añadir cuenta</button>
+      <button class="icon-btn" id="btn-import" title="Importar desde Excel o CSV"><i class="ph ph-upload-simple"></i></button>
+    </div>`;
+  $('btn-add').onclick = () => openEditor(null);
+  $('btn-import').onclick = () => openImport();
+  applyNarrowVisibility();
+
+  const scroll = $('list-scroll');
+  if (empty){
+    scroll.appendChild(el('div','empty-state', `<i class="ph ph-tray"></i><div>Todavía no hay nada guardado.</div>`));
+    return;
+  }
+  if (!items.length){
+    scroll.appendChild(el('div','empty-state', `<i class="ph ph-magnifying-glass"></i><div style="font-weight:500;font-size:14px;margin-bottom:5px;color:var(--tx)">Nada por aquí</div><div>Ninguna cuenta coincide. Prueba con menos letras o revisa otra vista.</div>`));
+    return;
+  }
+  for (const e of items) scroll.appendChild(buildListRow(e));
+}
+
+function buildListRow(e){
+  const row = el('div','list-row'+(state.sel===e.id?' on':''));
+  const tile = buildTile(e, 26, () => renderListPanel());
+  tile.style.borderRadius = '7px';
+  const body = el('div','list-row-body');
+  const top = el('div','list-row-top');
+  const service = el('span','list-row-service'); service.textContent = e.service || 'Sin nombre';
+  top.appendChild(service);
+  if (e.has2FA){
+    const tfa = el('i','ph ph-shield-check');
+    tfa.title = 'Tiene segundo paso';
+    tfa.style.cssText = 'font-size:14px;color:var(--acl);flex:none';
+    top.appendChild(tfa);
+  }
+  body.appendChild(top);
+  const user = el('div','list-row-user'); user.textContent = e.username || '—';
+  body.appendChild(user);
+  if (e._v.t !== 'Fuerte'){
+    const warn = el('div','list-row-warn');
+    warn.innerHTML = `<i class="ph-fill ph-warning-circle" style="font-size:12px;color:${e._v.c};flex:none"></i><span style="color:${e._v.c}">${e._v.t}</span>`;
+    body.appendChild(warn);
+  }
+  row.append(tile, body);
+  row.onclick = () => selectEntry(e.id);
+  return row;
+}
+
+/* ====================  DETALLE DE LA CUENTA  ==================== */
+function renderDetailArea(){
+  const box = $('detail-pane');
+  if (!box) return;
+  applyNarrowVisibility();
+  if (!state.entries.length){ box.innerHTML = ''; box.appendChild(buildOnboarding()); return; }
+  const e = state.entries.find(x => x.id === state.sel);
+  if (!e){ box.innerHTML = ''; return; }
+  box.innerHTML = '';
+  box.appendChild(buildDetail(e));
+}
+
+function buildDetail(entry){
+  const repes = repeticiones(state.entries);
+  const v = veredicto(entry, repes.get(entry.password) || 0);
+  const bits = estimateBits(entry.password || '');
+  const wrap = el('div','detail-body');
+
+  const head = el('div','detail-head');
+  const backBtn = el('button','icon-btn back-to-list', '<i class="ph ph-arrow-left"></i>');
+  backBtn.title = 'Volver a la lista'; backBtn.onclick = backToList;
+  const tile = buildTile(entry, 42, () => renderDetailArea());
+  tile.style.borderRadius = '10px';
+  const idBox = el('div', null, `<div class="detail-name">${escapeHtml(entry.service||'Sin nombre')}</div><div class="detail-url">${escapeHtml(entry.url||'sin sitio guardado')}</div>`);
+  idBox.style.flex = '1'; idBox.style.minWidth = '0';
+  const favBtn = mkIcon(entry.fav ? 'ph-fill ph-star' : 'ph ph-star', 'Favorita');
+  favBtn.style.color = entry.fav ? 'var(--amb)' : 'var(--md)';
+  favBtn.onclick = async () => { entry.fav = !entry.fav; try{ await persist(); }catch(e){} renderSidebar(); renderDetailArea(); };
+  head.append(backBtn, tile, idBox, favBtn);
+  wrap.appendChild(head);
+
+  const advice = v.t === 'Comprometida' ? 'Esta contraseña apareció en una filtración pública. Cámbiala hoy.'
+    : v.t === 'Débil' ? 'Muy corta o sin variedad de caracteres. Se adivina en minutos — llévala a 16 o más.'
+    : v.t === 'Repetida' ? 'La usas en más de una cuenta. Si se filtra una, se abren todas: dale a cada una la suya.'
+    : v.t === 'Mejorable' ? 'Aguanta lo básico, pero le faltan largo y variedad para una cuenta que te importe.'
+    : v.t === 'Vieja' ? 'Es sólida, pero lleva mucho sin cambiar. Renuévala cuando puedas.'
+    : 'Larga, única y sin apariciones en filtraciones conocidas. No hay nada que hacer aquí.';
+  const verdict = el('div','verdict-card');
+  verdict.style.boxShadow = 'inset 3px 0 0 '+v.c+', inset 0 1px 0 rgba(231,236,232,.06)';
+  verdict.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px">
+      <i class="${v.t==='Fuerte'?'ph-fill ph-shield-check':'ph-fill ph-warning-circle'}" style="font-size:17px;color:${v.c}"></i>
+      <span style="font-weight:600;font-size:15px;color:${v.c}">${v.t}</span>
+      <span style="font-family:var(--mono);font-size:11.5px;color:var(--md);font-feature-settings:'tnum'">${bits} bits</span>
+    </div>
+    <div style="font-size:12.5px;color:var(--md);margin-top:7px;line-height:1.6">${advice}</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+      <div style="display:flex;gap:2px;flex:1;min-width:0">
+        <div style="height:4px;border-radius:2px;background:${v.c};flex:${Math.max(4,Math.min(100,bits))}"></div>
+        <div style="height:4px;border-radius:2px;background:rgba(231,236,232,.16);flex:${Math.max(1,100-Math.min(100,bits))}"></div>
+      </div>
+      ${v.t!=='Fuerte' ? '<button class="btn sm" id="d-gen" style="flex:none;border-color:'+v.c+';color:'+v.c+'">Generar nueva</button>' : ''}
+    </div>`;
+  wrap.appendChild(verdict);
+
+  const mask = '•'.repeat(Math.min(16,(entry.password||'').length||10));
+  const fields = el('div','field-list');
+  fields.innerHTML = `
+    <div class="field-row"><div class="k">Usuario</div><div class="v" style="font-family:var(--mono)">${escapeHtml(entry.username||'—')}</div>
+      <button class="icon-btn" id="d-copy-user" title="Copiar usuario"><i class="ph ph-copy"></i></button></div>
+    <hr class="fade">
+    <div class="field-row"><div class="k">Contraseña</div><div class="v" id="d-pw" style="font-family:var(--mono);color:${state.reveal?'var(--tx)':'var(--ft)'};letter-spacing:${state.reveal?'0':'.14em'}">${state.reveal?escapeHtml(entry.password||'—'):mask}</div>
+      <button class="icon-btn" id="d-reveal" title="Mostrar"><i class="ph ${state.reveal?'ph-eye-slash':'ph-eye'}"></i></button>
+      <button class="icon-btn" id="d-copy-pw" title="Copiar contraseña"><i class="ph ph-copy"></i></button></div>
+    <hr class="fade">
+    <div class="field-row"><div class="k">Dos pasos</div><div class="v" style="color:${entry.has2FA?'var(--grn)':'var(--md)'}">${entry.has2FA ? 'Activo · '+escapeHtml(entry.twoFAType||'sin detalle') : 'Sin segundo paso'}</div></div>
+    <hr class="fade">
+    <div class="field-row top"><div class="k">Notas</div><div class="v pre">${escapeHtml(entry.notes || 'Sin notas.')}</div></div>`;
+  wrap.appendChild(fields);
+
+  const actions = el('div', null);
+  actions.style.cssText = 'display:flex;align-items:center;gap:7px;margin-top:14px;flex-wrap:wrap';
+  const bEdit = el('button','btn sm','<i class="ph ph-pencil-simple"></i>Editar');
+  bEdit.onclick = () => openEditor(entry);
+  const bHist = el('button','btn sm','<i class="ph ph-clock-counter-clockwise"></i><span>Historial · '+(entry.history||[]).length+'</span>');
+  bHist.onclick = () => openHistory(entry);
+  const spacer = el('div'); spacer.style.flex = '1';
+  const bDel = el('button','btn sm danger','<i class="ph ph-trash"></i>Eliminar');
+  let confirmDel = false, delTimer = null;
+  bDel.onclick = async () => {
+    if (!confirmDel){
+      confirmDel = true; bDel.innerHTML = '<i class="ph ph-trash"></i>¿Confirmar?';
+      delTimer = setTimeout(() => { confirmDel = false; bDel.innerHTML = '<i class="ph ph-trash"></i>Eliminar'; }, 3000);
+      return;
+    }
+    clearTimeout(delTimer);
+    const idx = state.entries.findIndex(x => x.id === entry.id);
+    if (idx < 0) return;
+    const removed = state.entries.splice(idx,1)[0];
+    try {
+      await persist();
+      state.sel = (state.entries[0]||{}).id || null;
+      renderSidebar(); renderListPanel(); renderDetailArea();
+      toast('Cuenta eliminada','ok');
+    } catch(err){ state.entries.splice(idx,0,removed); toast('No se pudo eliminar','warn'); }
+  };
+  actions.append(bEdit, bHist, spacer, bDel);
+  wrap.appendChild(actions);
+
+  const meta = el('div', null);
+  meta.style.cssText = 'margin-top:13px;font-size:11.5px;color:var(--ft);line-height:1.6';
+  const histN = (entry.history||[]).length;
+  meta.textContent = 'Cambiada ' + relativeTime(entry.updatedAt) + ' · ' + (histN ? histN + (histN===1?' versión guardada':' versiones guardadas') : 'sin versiones anteriores') + (entry.folder ? ' · colección '+entry.folder : '');
+  wrap.appendChild(meta);
+
+  wrap.querySelector('#d-copy-user').onclick = () => copy(entry.username||'', 'Usuario copiado');
+  wrap.querySelector('#d-copy-pw').onclick = () => copy(entry.password||'', 'Contraseña copiada');
+  wrap.querySelector('#d-reveal').onclick = () => { state.reveal = !state.reveal; renderDetailArea(); };
+  const genBtn = wrap.querySelector('#d-gen');
+  if (genBtn) genBtn.onclick = () => openGenerator();
+  return wrap;
+}
+
+function buildOnboarding(){
+  const wrap = el('div','detail-body');
+  wrap.innerHTML = `
+    <div style="font-weight:500;font-size:21px;letter-spacing:-.015em">Tu bóveda está lista y vacía</div>
+    <div style="font-size:13px;color:var(--md);margin-top:7px;line-height:1.6">Tres formas de empezar. La primera es la más rápida si tienes tus contraseñas en una hoja de Excel.</div>
+    <div style="margin-top:18px;display:flex;flex-direction:column;gap:9px">
+      <div class="onboard-opt" id="ob-import"><i class="ph ph-file-csv lead"></i><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px">Traer todo de una hoja de Excel</div><div style="font-size:12.5px;color:var(--md);margin-top:3px;line-height:1.55">Guarda tu hoja como CSV y la leo entera. Reconoce columnas en español.</div></div><i class="ph ph-arrow-right trail"></i></div>
+      <div class="onboard-opt" id="ob-add"><i class="ph ph-plus-circle lead"></i><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px">Añadir la primera a mano</div><div style="font-size:12.5px;color:var(--md);margin-top:3px;line-height:1.55">Empieza por la que más te importa: tu correo o tu banco.</div></div><i class="ph ph-arrow-right trail"></i></div>
+      <div class="onboard-opt" id="ob-gen"><i class="ph ph-arrows-clockwise lead"></i><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px">Generar una contraseña nueva</div><div style="font-size:12.5px;color:var(--md);margin-top:3px;line-height:1.55">Para cuando vayas a cambiar una que ya sabes que está mala.</div></div><i class="ph ph-arrow-right trail"></i></div>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:9px;align-items:flex-start;color:var(--ft);font-size:12px;line-height:1.6">
+      <i class="ph ph-info" style="font-size:15px;flex:none;margin-top:1px"></i>
+      <div>Todo se cifra en esta computadora antes de tocar el disco.</div>
+    </div>`;
+  wrap.querySelector('#ob-import').onclick = () => openImport();
+  wrap.querySelector('#ob-add').onclick = () => openEditor(null);
+  wrap.querySelector('#ob-gen').onclick = () => openGenerator();
+  return wrap;
+}
+
+/* ====================  PANELES DESLIZANTES  ==================== */
+/* cubren solo el panel de detalle (position:absolute;inset:0 dentro de #detail-pane),
+   la barra lateral y la lista siguen visibles y usables debajo */
+function openPanel(node){
+  closePanel();
+  node.id = 'active-panel';
+  const dp = $('detail-pane');
+  if (dp) dp.appendChild(node);
+  document.addEventListener('keydown', escClosePanel);
+}
+function escClosePanel(e){ if (e.key === 'Escape') closePanel(); }
+function closePanel(){
+  const p = $('active-panel');
+  if (p) p.remove();
+  document.removeEventListener('keydown', escClosePanel);
+}
+function panelShell(title, subtitle){
+  const p = el('div','side-panel');
+  p.innerHTML = `
+    <div class="side-panel-head">
+      <div style="flex:1;min-width:0">
+        <div class="side-panel-title">${title}</div>
+        ${subtitle ? `<div style="font-size:12px;color:var(--ft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${subtitle}</div>` : ''}
+      </div>
+      <button class="icon-btn" id="panel-x" title="Cerrar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="side-panel-body" id="panel-body"></div>`;
+  p.querySelector('#panel-x').onclick = closePanel;
+  return p;
+}
+function panelFoot(p){
+  const foot = el('div','side-panel-foot');
+  p.appendChild(foot);
+  return foot;
+}
+
+/* ---------- editor de cuenta ---------- */
+function openEditor(entry){
+  const isNew = !entry;
+  const e = entry || { id:uid(), service:'', username:'', password:'', url:'', has2FA:false, twoFAType:'', notes:'', logo:'', logoMode:'auto', folder:'', fav:false };
+  let workLogoMode = e.logoMode || 'auto', workLogo = e.logo || '';
+
+  const p = panelShell(isNew ? 'Nueva cuenta' : 'Editar cuenta');
+  const body = p.querySelector('#panel-body');
+  body.innerHTML = `
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin-bottom:6px">Servicio o sitio</label>
+    <input class="inp" id="f-service" placeholder="Gmail, BAC, Netflix…" value="${escapeAttr(e.service)}">
+
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:15px 0 6px">Icono</label>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div id="f-tile-slot"></div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px" id="f-icon-modes"></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--ft);margin-top:7px;line-height:1.55" id="f-icon-note"></div>
+    <input type="file" id="f-logo-file" accept="image/*" style="display:none">
+
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:15px 0 6px">Usuario o correo</label>
+    <input class="inp inp-mono" id="f-user" placeholder="correo@ejemplo.com" value="${escapeAttr(e.username)}">
+
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:13px 0 6px">Contraseña</label>
+    <div class="pw-row">
+      <input class="inp inp-mono" id="f-pass" type="text" placeholder="pégala o genérala" value="${escapeAttr(e.password)}">
+      <button class="icon-btn" id="f-gen" title="Generar una nueva"><i class="ph ph-arrows-clockwise"></i></button>
+    </div>
+    <div class="meter" id="f-meter"><span></span><span></span><span></span><span></span></div>
+    <div class="meter-label"><span id="f-lab">—</span><b id="f-bits"></b></div>
+    ${!isNew ? '<div id="f-replacing" style="display:none;gap:8px;margin-top:9px;padding:9px 11px;background:rgba(230,180,95,.09);border:1px solid rgba(230,180,95,.28);border-radius:8px"><i class="ph-fill ph-clock-counter-clockwise" style="font-size:14px;color:var(--amb);flex:none;margin-top:1px"></i><div style="font-size:11.5px;color:var(--md);line-height:1.55">La anterior se guarda en el historial con la fecha de hoy. No se pierde.</div></div>' : ''}
+
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:13px 0 6px">Sitio web</label>
+    <input class="inp inp-mono" id="f-url" placeholder="ejemplo.com" value="${escapeAttr(e.url)}">
+
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:13px 0 6px">Colección</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap" id="f-folders"></div>
+
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:15px 0 6px">Verificación en dos pasos</label>
+    <div class="check-line${e.has2FA?' on':''}" id="f-2fa">
+      <i class="${e.has2FA?'ph-fill ph-check-circle':'ph ph-circle'}"></i>
+      <span>Esta cuenta pide un segundo paso</span>
+    </div>
+    <input class="inp" id="f-2fatype" placeholder="¿Cómo? App, SMS, llave física…" value="${escapeAttr(e.twoFAType)}" style="margin-top:8px;${e.has2FA?'':'display:none'}">
+
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:15px 0 6px">Notas</label>
+    <textarea class="inp" id="f-notes" placeholder="Preguntas de seguridad, códigos de respaldo, dónde está la llave física…">${escapeHtml(e.notes)}</textarea>
+    <div style="font-size:11.5px;color:var(--ft);margin-top:7px;line-height:1.55">Todo esto queda dentro del archivo cifrado, igual que la contraseña.</div>`;
+  const foot = panelFoot(p);
+  foot.innerHTML = `<button class="btn" id="f-cancel">Cancelar</button>
+                    <button class="btn primary" id="f-save"><i class="ph ph-check"></i>Guardar</button>`;
+
+  const renderTile = () => {
+    const slot = body.querySelector('#f-tile-slot');
+    slot.innerHTML = '';
+    const tile = buildTile({ service: body.querySelector('#f-service').value, url: body.querySelector('#f-url').value, logo: workLogo, logoMode: workLogoMode }, 46, renderTile);
+    tile.style.borderRadius = '11px';
+    slot.appendChild(tile);
+  };
+  const renderModes = () => {
+    const modes = [
+      { k:'auto', label:'Del sitio, automático', icon:'ph ph-globe' },
+      { k:'letra', label:'Solo la letra', icon:'ph ph-text-aa' },
+      { k:'archivo', label:'Subir una imagen', icon:'ph ph-image' },
+    ];
+    const box = body.querySelector('#f-icon-modes');
+    box.innerHTML = modes.map(m => `
+      <div class="chip" style="justify-content:flex-start" data-mode="${m.k}"><i class="${m.icon}" style="font-size:14px;flex:none"></i><span>${m.label}</span></div>`).join('');
+    box.querySelectorAll('[data-mode]').forEach(row => {
+      row.classList.toggle('on', workLogoMode === row.dataset.mode);
+      row.onclick = () => {
+        workLogoMode = row.dataset.mode;
+        if (workLogoMode === 'archivo') body.querySelector('#f-logo-file').click();
+        renderModes(); renderTile(); renderNote();
+      };
+    });
+  };
+  const renderNote = () => {
+    const url = body.querySelector('#f-url').value;
+    body.querySelector('#f-icon-note').textContent =
+      workLogoMode === 'auto' ? (url ? 'Bajo el favicon de ' + (domainOf(url) || 'ese dominio') + ' y lo guardo cifrado. Si no lo encuentro, queda la letra.' : 'Escribe el sitio web abajo y busco su icono. Solo si activaste "Traer iconos" en Ajustes.')
+      : workLogoMode === 'letra' ? 'La inicial sobre un tono derivado del nombre — siempre el mismo para la misma cuenta.'
+      : 'PNG o JPG, se reduce a 128 px y vive dentro del archivo cifrado.';
+  };
+  renderTile(); renderModes(); renderNote();
+  body.querySelector('#f-service').addEventListener('input', () => { renderTile(); });
+  body.querySelector('#f-url').addEventListener('input', () => { renderTile(); renderNote(); });
+  body.querySelector('#f-logo-file').onchange = (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    if (file.size > 2*1024*1024){ toast('La imagen es muy grande (máx. 2 MB)','warn'); return; }
+    resizeImage(file, 128).then(dataUrl => { workLogo = dataUrl; renderTile(); })
+      .catch(() => toast('No se pudo cargar la imagen','warn'));
+  };
+
+  let workFolder = e.folder || '';
+  const renderFolders = () => {
+    const box = body.querySelector('#f-folders');
+    box.innerHTML = FOLDERS_SUGERIDAS.map(f => `<div class="chip" data-f="${escapeAttr(f)}">${escapeHtml(f)}</div>`).join('');
+    box.querySelectorAll('[data-f]').forEach(chip => {
+      chip.classList.toggle('on', workFolder === chip.dataset.f);
+      chip.onclick = () => { workFolder = (workFolder === chip.dataset.f) ? '' : chip.dataset.f; renderFolders(); };
+    });
+  };
+  renderFolders();
+
+  body.querySelector('#f-2fa').onclick = () => {
+    const box = body.querySelector('#f-2fa');
+    const on = box.classList.toggle('on');
+    box.querySelector('i').className = on ? 'ph-fill ph-check-circle' : 'ph ph-circle';
+    body.querySelector('#f-2fatype').style.display = on ? '' : 'none';
+  };
+  const refreshMeter = () => {
+    const pw = body.querySelector('#f-pass').value;
+    const bits = estimateBits(pw);
+    const s = strengthInfo(bits);
+    const segs = body.querySelector('#f-meter').children;
+    for (let i=0;i<4;i++) segs[i].style.background = i < s.fill ? s.color : 'rgba(231,236,232,.16)';
+    body.querySelector('#f-lab').textContent = pw ? s.label : '—';
+    body.querySelector('#f-bits').textContent = pw ? bits+' bits' : '';
+    const rep = body.querySelector('#f-replacing');
+    if (rep) rep.style.display = (!isNew && e.password && pw !== e.password) ? 'flex' : 'none';
+  };
+  body.querySelector('#f-pass').oninput = refreshMeter;
+  refreshMeter();
+  body.querySelector('#f-gen').onclick = () => openGenerator((pw) => {
+    body.querySelector('#f-pass').value = pw; refreshMeter();
+  });
+  foot.querySelector('#f-cancel').onclick = closePanel;
+  foot.querySelector('#f-save').onclick = async () => {
+    const service = body.querySelector('#f-service').value.trim();
+    if (!service){ toast('Ponle un nombre al servicio', 'warn'); return; }
+    e.service = service;
+    e.username = body.querySelector('#f-user').value.trim();
+    e.logo = workLogo; e.logoMode = workLogoMode; e.folder = workFolder;
+    // si la contraseña cambió, archiva la anterior con la fecha del cambio
+    const newPass = body.querySelector('#f-pass').value;
+    let archived = false;
+    if (!isNew && e.password && newPass !== e.password){
+      if (!Array.isArray(e.history)) e.history = [];
+      e.history.unshift({ password: e.password, changedAt: Date.now() });
+      archived = true;
+    }
+    const passChanged = isNew || archived;
+    if (passChanged){ e.pwnedCount = null; e.pwnedCheckedAt = null; }
+    e.password = newPass;
+    e.url = body.querySelector('#f-url').value.trim();
+    e.has2FA = body.querySelector('#f-2fa').classList.contains('on');
+    e.twoFAType = e.has2FA ? body.querySelector('#f-2fatype').value.trim() : '';
+    e.notes = body.querySelector('#f-notes').value.trim();
+    e.updatedAt = Date.now();
+    if (isNew){ e.createdAt = Date.now(); e.history = []; e.fav = false; state.entries.push(e); }
+    try {
+      await persist();
+      state.sel = e.id;
+      closePanel(); renderSidebar(); renderListPanel(); renderDetailArea();
+      toast(isNew ? 'Cuenta añadida'
+        : (archived ? 'Guardado · contraseña anterior archivada' : 'Cambios guardados'), 'ok');
+      if (state.settings.checkBreaches && passChanged && e.password){
+        vecesFiltrada(e.password).then(async n => {
+          e.pwnedCount = n; e.pwnedCheckedAt = Date.now();
+          try { await persist(); renderListPanel(); renderDetailArea(); } catch(err){}
+        }).catch(()=>{});
+      }
+    } catch(err){
+      if (isNew) state.entries.pop();
+      toast('No se pudo guardar', 'warn');
+    }
+  };
+  openPanel(p);
+  setTimeout(()=>body.querySelector('#f-service').focus(), 50);
+}
+
+/* redimensiona una imagen a un cuadrado de N px y la devuelve como dataURL PNG */
+function resizeImage(file, size){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        // encaja la imagen dentro del cuadrado sin deformarla
+        const scale = Math.min(size/img.width, size/img.height);
+        const w = img.width*scale, h = img.height*scale;
+        ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ---------- confirmar borrado ---------- */
+/* ---------- historial de contraseñas ---------- */
+function openHistory(entry){
+  const p = panelShell('Historial', escapeHtml(entry.service));
+  const body = p.querySelector('#panel-body');
+  body.innerHTML = `
+    <div style="font-size:12.5px;color:var(--md);line-height:1.6;margin-bottom:14px">Contraseñas que esta cuenta tuvo antes, con la fecha en que las reemplazaste. La más reciente arriba.</div>
+    <div id="hist-list"></div>`;
+
+  function renderHistList(){
+    const list = body.querySelector('#hist-list');
+    list.innerHTML = '';
+    const hist = Array.isArray(entry.history) ? entry.history : [];
+    if (!hist.length){
+      list.appendChild(el('div','empty-state',
+        '<i class="ph ph-clock-counter-clockwise"></i><div>Esta cuenta no ha cambiado de contraseña desde que la guardaste.</div>'));
+      return;
+    }
+    hist.forEach((item,idx) => list.appendChild(buildHistoryRow(entry,item,idx,renderHistList)));
+  }
+  renderHistList();
+  openPanel(p);
+}
+function buildHistoryRow(entry, item, idx, rerender){
+  const row = el('div','hist-item');
+  const main = el('div','hist-main');
+  const pw = el('div','hist-pw');
+  const mask = () => '•'.repeat(Math.min(14,(item.password||'').length||10));
+  pw.textContent = mask();
+  const date = el('div','hist-date');
+  date.textContent = 'Reemplazada el ' + formatDate(item.changedAt) + ' · ' + relativeTime(item.changedAt);
+  main.append(pw, date);
+
+  let shown = false;
+  const bShow = mkIcon('ph ph-eye','Mostrar');
+  bShow.onclick = () => {
+    shown = !shown;
+    pw.textContent = shown ? (item.password||'—') : mask();
+    pw.classList.toggle('shown', shown);
+    bShow.innerHTML = `<i class="ph ${shown?'ph-eye-slash':'ph-eye'}"></i>`;
+  };
+  const bCopy = mkIcon('ph ph-copy','Copiar esta contraseña');
+  bCopy.onclick = () => copy(item.password||'', 'Contraseña anterior copiada');
+  const bDel = mkIcon('ph ph-trash','Quitar del historial','danger');
+  bDel.onclick = async () => {
+    if (!Array.isArray(entry.history)) return;
+    entry.history.splice(idx,1);
+    try { await persist(); rerender(); renderDetailArea(); toast('Entrada eliminada','ok'); }
+    catch(e){ toast('No se pudo guardar','warn'); }
+  };
+  row.append(main,bShow,bCopy,bDel);
+  return row;
+}
+function formatDate(ts){
+  if (!ts) return 'fecha desconocida';
+  const d = new Date(ts);
+  return d.toLocaleDateString('es-CR',{day:'numeric',month:'long',year:'numeric'}) +
+         ', ' + d.toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'});
+}
+function relativeTime(ts){
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff/60000);
+  if (min < 1)  return 'recién';
+  if (min < 60) return 'hace ' + min + (min===1?' minuto':' minutos');
+  const hr = Math.floor(min/60);
+  if (hr < 24)  return 'hace ' + hr + (hr===1?' hora':' horas');
+  const day = Math.floor(hr/24);
+  if (day < 30) return 'hace ' + day + (day===1?' día':' días');
+  const mon = Math.floor(day/30);
+  if (mon < 12) return 'hace ' + mon + (mon===1?' mes':' meses');
+  const yr = Math.floor(mon/12);
+  return 'hace ' + yr + (yr===1?' año':' años');
+}
+
+/* ---------- generador ---------- */
+const genOpts = { length:20, upper:true, lower:true, digits:true, symbols:true, avoidAmbiguous:false };
+const GEN_SETS = [
+  ['upper','Mayúsculas','ph ph-text-aa'],
+  ['lower','Minúsculas','ph ph-text-aa'],
+  ['digits','Números','ph ph-hash'],
+  ['symbols','Símbolos','ph ph-asterisk'],
+];
+function openGenerator(onUse){
+  const p = panelShell('Generador');
+  const body = p.querySelector('#panel-body');
+  body.innerHTML = `
+    <div class="gen-out" id="g-out" style="background:rgba(10,15,11,.5);border:1px solid var(--ln);border-radius:10px;padding:14px;font-family:var(--mono);font-size:15.5px;line-height:1.5;color:var(--acl);word-break:break-all;min-height:52px"></div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:10px">
+      <span id="g-lab" style="font-weight:600;font-size:14px">—</span>
+      <span id="g-bits" style="font-family:var(--mono);font-size:11.5px;color:var(--md);font-feature-settings:'tnum'"></span>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:14px">
+      <button class="btn" id="g-regen" style="flex:1"><i class="ph ph-arrows-clockwise"></i>Otra</button>
+      ${onUse ? '<button class="btn primary" id="g-use" style="flex:1"><i class="ph ph-check"></i>Usar esta</button>'
+              : '<button class="btn primary" id="g-copy" style="flex:1"><i class="ph ph-copy"></i>Copiar</button>'}
+    </div>
+    <hr class="fade" style="margin:18px 0 14px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:12px;color:var(--ft);flex:none">Largo</span>
+      <input type="range" id="g-len" min="6" max="40" value="${genOpts.length}" style="flex:1">
+      <span id="g-lenval" style="font-family:var(--mono);font-size:14px;width:24px;text-align:right;flex:none;font-feature-settings:'tnum'">${genOpts.length}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:14px" id="g-sets"></div>
+    <div style="margin-top:8px"><div class="chip" id="g-amb" style="width:100%;box-sizing:border-box;justify-content:flex-start"><i class="ph ph-circle"></i>Evitar caracteres ambiguos (O,0,l,1…)</div></div>
+    <div style="font-size:11.5px;color:var(--ft);margin-top:16px;line-height:1.6">Se arma con azar del sistema y garantiza al menos un carácter de cada tipo activo.</div>`;
+
+  const out = body.querySelector('#g-out');
+  body.querySelector('#g-sets').innerHTML = GEN_SETS.map(([key,label,icon]) =>
+    `<div class="chip" data-k="${key}" style="justify-content:flex-start"><i class="${icon}"></i>${label}</div>`).join('');
+
+  const regen = () => {
+    const pw = generatePassword(genOpts);
+    out.textContent = pw || 'Activa al menos un tipo de carácter';
+    const bits = pw ? genEntropy(genOpts) : 0;
+    const s = strengthInfo(bits);
+    body.querySelector('#g-lab').textContent = pw ? s.label : '—';
+    body.querySelector('#g-lab').style.color = pw ? s.color : 'var(--ft)';
+    body.querySelector('#g-bits').textContent = pw ? bits+' bits' : '';
+  };
+  const lenSlider = body.querySelector('#g-len');
+  lenSlider.oninput = (ev) => { genOpts.length = +ev.target.value; body.querySelector('#g-lenval').textContent = genOpts.length; regen(); };
+  body.querySelectorAll('#g-sets [data-k]').forEach(chip => {
+    chip.classList.toggle('on', genOpts[chip.dataset.k]);
+    chip.querySelector('i').className = genOpts[chip.dataset.k] ? 'ph-fill ph-check-circle' : chip.querySelector('i').className;
+    chip.onclick = () => {
+      genOpts[chip.dataset.k] = !genOpts[chip.dataset.k];
+      chip.classList.toggle('on', genOpts[chip.dataset.k]);
+      chip.querySelector('i').className = genOpts[chip.dataset.k] ? 'ph-fill ph-check-circle' : GEN_SETS.find(g=>g[0]===chip.dataset.k)[2];
+      regen();
+    };
+  });
+  const ambChip = body.querySelector('#g-amb');
+  ambChip.classList.toggle('on', genOpts.avoidAmbiguous);
+  if (genOpts.avoidAmbiguous) ambChip.querySelector('i').className = 'ph-fill ph-check-circle';
+  ambChip.onclick = () => {
+    genOpts.avoidAmbiguous = !genOpts.avoidAmbiguous;
+    ambChip.classList.toggle('on', genOpts.avoidAmbiguous);
+    ambChip.querySelector('i').className = genOpts.avoidAmbiguous ? 'ph-fill ph-check-circle' : 'ph ph-circle';
+    regen();
+  };
+  regen();
+  body.querySelector('#g-regen').onclick = regen;
+  if (onUse){
+    body.querySelector('#g-use').onclick = () => {
+      if (!out.textContent || out.textContent.startsWith('Activa')) return;
+      onUse(out.textContent); closePanel();
+    };
+  } else {
+    body.querySelector('#g-copy').onclick = () => {
+      if (!out.textContent || out.textContent.startsWith('Activa')) return;
+      copy(out.textContent, 'Contraseña copiada');
+    };
+  }
+  openPanel(p);
+}
+
+/* ---------- importar CSV ---------- */
+const CSV_COL_LABEL = { service:'servicio', username:'correo', password:'contraseña', twofa:'2fa', url:'url', notes:'notas' };
+function openImport(){
+  const p = panelShell('Traer de Excel o CSV');
+  const body = p.querySelector('#panel-body');
+  body.innerHTML = `
+    <div style="font-size:12.5px;color:var(--md);line-height:1.6">En Excel: <strong style="color:var(--tx);font-weight:500">Archivo › Guardar como › CSV</strong>. Reconozco los encabezados en español o en inglés, en cualquier orden.</div>
+    <input type="file" id="imp-file" accept=".csv,.txt" style="display:none">
+    <div style="margin-top:14px;border:1px dashed rgba(231,236,232,.22);border-radius:12px;padding:22px;text-align:center;background:rgba(10,15,11,.3)">
+      <i class="ph ph-file-csv" style="font-size:30px;color:var(--acl);margin:0 auto 10px;display:block;width:fit-content"></i>
+      <div style="font-size:13px;font-weight:500">Elige tu archivo CSV</div>
+      <div style="font-size:12px;color:var(--ft);margin-top:3px">o pega el contenido abajo</div>
+      <button class="btn sm primary" id="imp-pick" style="margin-top:9px">Elegir archivo</button>
+    </div>
+    <div class="field" style="margin-top:12px;margin-bottom:6px">
+      <textarea class="inp inp-mono" id="imp-text" style="min-height:90px" placeholder="servicio,correo,contraseña,2fa&#10;Gmail,yo@gmail.com,clave123,si"></textarea>
+    </div>
+    <div id="imp-preview"></div>
+    <div class="err" id="imp-msg"></div>`;
+  const foot = panelFoot(p);
+  foot.innerHTML = `<button class="btn" id="imp-cancel">Cancelar</button>
+                    <button class="btn primary" id="imp-go" disabled><i class="ph ph-check"></i><span id="imp-label">Importar</span></button>`;
+
+  let parsedRows = [];
+  const refreshPreview = () => {
+    const text = body.querySelector('#imp-text').value.trim();
+    const prev = body.querySelector('#imp-preview');
+    const goBtn = foot.querySelector('#imp-go');
+    body.querySelector('#imp-msg').textContent = '';
+    if (!text){ prev.innerHTML = ''; goBtn.disabled = true; foot.querySelector('#imp-label').textContent = 'Importar'; return; }
+    const delim = detectDelim(text.split('\n')[0]||'');
+    const rows = parseCSV(text, delim);
+    const headerRow = rows[0] || [];
+    const found = [];
+    headerRow.forEach(cell => { const f = matchHeader(cell); if (f) found.push(f); });
+    parsedRows = importFromCSV(text);
+    if (!parsedRows.length){
+      prev.innerHTML = '';
+      goBtn.disabled = true; foot.querySelector('#imp-label').textContent = 'Importar';
+      body.querySelector('#imp-msg').textContent = 'No se encontraron filas válidas';
+      return;
+    }
+    prev.innerHTML = `
+      <div class="card" style="margin-top:14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <i class="ph-fill ph-check-circle" style="font-size:16px;color:var(--grn);flex:none"></i>
+          <span style="font-size:13px;font-weight:500">${parsedRows.length} fila${parsedRows.length===1?'':'s'} lista${parsedRows.length===1?'':'s'} para importar</span>
+        </div>
+        ${found.length ? `<div style="font-size:12px;color:var(--md);margin-top:8px">Encontré estas columnas:</div>
+        <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
+          ${found.map(f => `<span class="chip on" style="cursor:default">${CSV_COL_LABEL[f]||f}</span>`).join('')}
+        </div>` : ''}
+      </div>
+      <div style="margin-top:9px;display:flex;gap:8px;padding:11px 13px;background:rgba(230,180,95,.08);border:1px solid rgba(230,180,95,.26);border-radius:10px">
+        <i class="ph-fill ph-warning-circle" style="font-size:15px;color:var(--amb);flex:none;margin-top:1px"></i>
+        <div style="font-size:12px;color:var(--md);line-height:1.6">Después de importar, <strong style="color:var(--tx);font-weight:500">borra el CSV de tu computadora</strong>. Ahí las contraseñas están en texto plano.</div>
+      </div>`;
+    goBtn.disabled = false;
+    foot.querySelector('#imp-label').textContent = 'Importar ' + parsedRows.length + (parsedRows.length===1?' cuenta':' cuentas');
+  };
+  body.querySelector('#imp-text').oninput = refreshPreview;
+  body.querySelector('#imp-pick').onclick = () => body.querySelector('#imp-file').click();
+  body.querySelector('#imp-file').onchange = (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => { body.querySelector('#imp-text').value = r.result; refreshPreview(); };
+    r.readAsText(file, 'utf-8');
+  };
+  foot.querySelector('#imp-cancel').onclick = closePanel;
+  foot.querySelector('#imp-go').onclick = async () => {
+    if (!parsedRows.length) return;
+    parsedRows.forEach(row => { row.id = uid(); row.createdAt = row.updatedAt = Date.now(); row.logoMode = 'auto'; row.fav = false; row.folder = row.folder || ''; });
+    const before = state.entries.length;
+    state.entries.push(...parsedRows);
+    try {
+      await persist();
+      state.sel = parsedRows[0].id;
+      closePanel(); renderSidebar(); renderListPanel(); renderDetailArea();
+      toast(parsedRows.length + ' cuentas importadas', 'ok');
+    } catch(err){
+      state.entries.length = before;
+      toast('No se pudo guardar la importación', 'warn');
+    }
+  };
+  openPanel(p);
+}
+
+/* ---------- ajustes ---------- */
+const LOCK_OPTS = [[0,'Nunca'],[1,'1 min'],[5,'5 min'],[15,'15 min'],[30,'30 min']];
+function openSettings(){
+  const p = panelShell('Ajustes y respaldo');
+  const body = p.querySelector('#panel-body');
+  body.innerHTML = `
+    <div class="section-label">Bloqueo</div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:500">Bloquear sola tras…</div>
+      <div style="font-size:12px;color:var(--md);margin-top:3px;line-height:1.55">Si dejas la computadora, la bóveda se cierra sin que tengas que acordarte.</div>
+      <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap" id="s-locks"></div>
+    </div>
+
+    <div class="section-label">Privacidad y red</div>
+    <div class="card">
+      <div class="check-line${state.settings.useFavicons?' on':''}" id="s-fav">
+        <i class="${state.settings.useFavicons?'ph-fill ph-check-circle':'ph ph-circle'}"></i>
+        <span>Traer el icono real de cada sitio</span>
+      </div>
+      <div style="font-size:12px;color:var(--md);margin-top:8px;line-height:1.6">Descarga el favicon del dominio que guardaste y lo deja dentro del archivo cifrado. Apagado, cada cuenta usa su monograma de letra y la app nunca sale a internet por esto.</div>
+    </div>
+    <div class="card" style="margin-top:9px">
+      <div class="check-line${state.settings.checkBreaches?' on':''}" id="s-breach">
+        <i class="${state.settings.checkBreaches?'ph-fill ph-check-circle':'ph ph-circle'}"></i>
+        <span>Comprobar contraseñas filtradas (HIBP)</span>
+      </div>
+      <div style="font-size:12px;color:var(--md);margin:8px 0 10px;line-height:1.6">Envía los primeros 5 caracteres del hash de cada contraseña a <span style="font-family:var(--mono);font-size:11px">haveibeenpwned.com</span> — nunca la contraseña — para saber si apareció en una filtración conocida.</div>
+      <button class="btn sm" id="s-breach-check" ${state.settings.checkBreaches ? '' : 'disabled'}><i class="ph ph-shield-check"></i>Comprobar ahora</button>
+    </div>
+
+    <div class="section-label">Respaldo</div>
+    <div class="card">
+      <div style="font-size:12.5px;color:var(--md);line-height:1.6">El respaldo cifrado solo se abre con tu clave maestra — puedes guardarlo en la nube sin miedo.</div>
+      <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn primary" id="s-backup" style="flex:1;min-width:150px"><i class="ph ph-download-simple"></i><span>Guardar respaldo</span></button>
+        <button class="btn" id="s-restore" style="flex:1;min-width:150px"><i class="ph ph-upload-simple"></i>Restaurar</button>
+      </div>
+    </div>
+    <input type="file" id="s-file" accept=".json" style="display:none">
+    <div class="danger-card" style="margin-top:9px" id="s-csv-box">
+      <div style="display:flex;align-items:center;gap:8px">
+        <i class="ph-fill ph-warning" style="font-size:16px;color:var(--red);flex:none"></i>
+        <span style="font-size:13px;font-weight:500;color:var(--red)">Exportar CSV sin cifrar</span>
+      </div>
+      <div style="font-size:12px;color:var(--md);margin-top:6px;line-height:1.55">Sale un archivo con todas tus contraseñas legibles. Solo para migrar a otro gestor — bórralo en cuanto termines.</div>
+      <button class="btn sm" id="s-csv" style="margin-top:11px;border-color:rgba(232,121,107,.5);color:var(--red)">Entiendo, exportar</button>
+    </div>
+
+    <div class="section-label">Clave maestra</div>
+    <div class="card" id="s-chg-row" style="cursor:pointer">
+      <div style="display:flex;align-items:center;gap:11px">
+        <i class="ph ph-key" style="font-size:19px;color:var(--acl);flex:none"></i>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500">Cambiar la clave maestra</div>
+          <div style="font-size:12px;color:var(--md);margin-top:2px" id="s-chg-sub"></div>
+        </div>
+        <i class="ph ph-arrow-right" style="font-size:16px;color:var(--ft);flex:none"></i>
+      </div>
+    </div>
+    <div class="card" id="s-rec-row" style="margin-top:9px;cursor:pointer">
+      <div style="display:flex;align-items:center;gap:11px">
+        <i class="ph ph-seal-check" style="font-size:19px;color:var(--acl);flex:none"></i>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500" id="s-rec-title">Código de recuperación</div>
+          <div style="font-size:12px;color:var(--md);margin-top:2px" id="s-rec-sub"></div>
+        </div>
+        <i class="ph ph-arrow-right" style="font-size:16px;color:var(--ft);flex:none"></i>
+      </div>
+    </div>`;
+
+  body.querySelector('#s-locks').innerHTML = LOCK_OPTS.map(([m,label]) =>
+    `<div class="chip${state.settings.autoLockMin===m?' on':''}" data-m="${m}">${label}</div>`).join('');
+  body.querySelectorAll('#s-locks [data-m]').forEach(chip => {
+    chip.onclick = async () => {
+      state.settings.autoLockMin = +chip.dataset.m;
+      body.querySelectorAll('#s-locks .chip').forEach(c => c.classList.toggle('on', c===chip));
+      try { await persist(); resetAutoLock(); renderAutoLockFoot(); toast('Ajuste guardado','ok'); }
+      catch(e){ toast('No se pudo guardar','warn'); }
+    };
+  });
+
+  (async () => {
+    const raw = await loadRaw();
+    const isV2 = (raw.version||1) >= 2;
+    body.querySelector('#s-chg-sub').textContent = isV2 ? 'Tu código de recuperación sigue sirviendo' : 'Vuelve a cifrar la bóveda entera con la nueva';
+    body.querySelector('#s-rec-title').textContent = isV2 ? 'Generar un código nuevo' : 'Activar código de recuperación';
+    body.querySelector('#s-rec-sub').textContent = isV2 ? 'El código actual deja de servir' : 'Una segunda puerta de 24 palabras, por si olvidas tu clave';
+    body.querySelector('#s-rec-row').onclick = () => openRecoveryAction(isV2);
+  })();
+  body.querySelector('#s-chg-row').onclick = () => openChangeMaster();
+
+  body.querySelector('#s-fav').onclick = async () => {
+    state.settings.useFavicons = !state.settings.useFavicons;
+    const box = body.querySelector('#s-fav');
+    box.classList.toggle('on', state.settings.useFavicons);
+    box.querySelector('i').className = state.settings.useFavicons ? 'ph-fill ph-check-circle' : 'ph ph-circle';
+    try { await persist(); toast('Ajuste guardado','ok'); renderListPanel(); renderDetailArea(); }
+    catch(e){ toast('No se pudo guardar','warn'); }
+  };
+  body.querySelector('#s-backup').onclick = async () => {
+    const raw = await loadRaw();
+    download('boveda-respaldo-'+dateStamp()+'.json', JSON.stringify(raw,null,2), 'application/json');
+    toast('Respaldo cifrado descargado','ok');
+  };
+  body.querySelector('#s-restore').onclick = () => body.querySelector('#s-file').click();
+  body.querySelector('#s-file').onchange = (ev) => {
+    const file = ev.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        const obj = JSON.parse(r.result);
+        const esV1 = obj.salt, esV2 = obj.salclave && obj.salfrase;
+        if (!obj.vault || !(esV1 || esV2)) throw new Error('formato');
+        await saveRaw(obj);
+        toast('Respaldo restaurado — abre con su clave maestra','ok');
+        setTimeout(()=>lockNow(false), 900);
+      } catch(e){ toast('Archivo de respaldo no válido','warn'); }
+    };
+    r.readAsText(file);
+  };
+  body.querySelector('#s-csv').onclick = () => {
+    download('boveda-cuentas-'+dateStamp()+'.csv', exportToCSV(), 'text/csv');
+    toast('CSV exportado — guárdalo con cuidado','warn');
+  };
+
+  const breachBox = body.querySelector('#s-breach');
+  const breachBtn = body.querySelector('#s-breach-check');
+  breachBox.onclick = async () => {
+    state.settings.checkBreaches = !state.settings.checkBreaches;
+    breachBox.classList.toggle('on', state.settings.checkBreaches);
+    breachBox.querySelector('i').className = state.settings.checkBreaches ? 'ph-fill ph-check-circle' : 'ph ph-circle';
+    breachBtn.disabled = !state.settings.checkBreaches;
+    try { await persist(); toast('Ajuste guardado','ok'); }
+    catch(e){ toast('No se pudo guardar','warn'); }
+  };
+  breachBtn.onclick = async () => {
+    if (!state.settings.checkBreaches) return;
+    breachBtn.disabled = true;
+    breachBtn.innerHTML = 'Comprobando…';
+    let checked = 0, found = 0;
+    for (const e of state.entries){
+      if (!e.password) continue;
+      if (e.pwnedCheckedAt && dias(e.pwnedCheckedAt) < 7) continue;
+      try {
+        e.pwnedCount = await vecesFiltrada(e.password);
+        e.pwnedCheckedAt = Date.now();
+        if (e.pwnedCount > 0) found++;
+        checked++;
+      } catch(err){ /* sin internet: se reintenta la próxima vez */ }
+    }
+    try { await persist(); } catch(err){}
+    breachBtn.disabled = false;
+    breachBtn.innerHTML = '<i class="ph ph-shield-check"></i>Comprobar ahora';
+    renderListPanel(); renderDetailArea();
+    toast(!checked ? 'Nada que comprobar' : (found ? found+' contraseña'+(found===1?'':'s')+' filtrada'+(found===1?'':'s') : 'Ninguna filtración encontrada'), found ? 'warn' : 'ok');
+  };
+  openPanel(p);
+}
+
+function openChangeMaster(){
+  const p = panelShell('Cambiar la clave maestra');
+  p.querySelector('.side-panel-head').insertAdjacentHTML('afterbegin',
+    '<button class="icon-btn" id="cm-back" title="Volver"><i class="ph ph-arrow-left"></i></button>');
+  p.querySelector('#cm-back').onclick = () => openSettings();
+  const body = p.querySelector('#panel-body');
+  body.innerHTML = `
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin-bottom:6px">Clave maestra actual</label>
+    <input type="password" class="inp inp-mono" id="cm-old" placeholder="la que usas hoy" autocomplete="off">
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:13px 0 6px">Nueva clave maestra</label>
+    <input type="password" class="inp inp-mono" id="cm-new" placeholder="mínimo 8 caracteres" autocomplete="off">
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:13px 0 6px">Repite la nueva</label>
+    <input type="password" class="inp inp-mono" id="cm-new2" placeholder="para confirmar" autocomplete="off">
+    <div class="err" id="cm-err"></div>
+    <button class="btn primary" id="cm-go" style="width:100%;margin-top:10px;padding:10px">Actualizar clave</button>`;
+  body.querySelector('#cm-go').onclick = async () => {
+    const err = body.querySelector('#cm-err');
+    const oldp = body.querySelector('#cm-old').value;
+    const np = body.querySelector('#cm-new').value;
+    const np2 = body.querySelector('#cm-new2').value;
+    err.textContent = '';
+    if (np.length < 8){ err.textContent = 'La nueva clave debe tener 8+ caracteres'; return; }
+    if (np !== np2){ err.textContent = 'La confirmación no coincide'; return; }
+
+    const raw = await loadRaw();
+    if ((raw.version||1) >= 2){
+      // esquema de dos puertas: solo se rehace el sobre de la clave — la bóveda no
+      // se vuelve a cifrar, y el código de 24 palabras sigue sirviendo tal cual.
+      try {
+        await cambiarClaveV2(oldp, np);
+        closePanel();
+        toast('Clave maestra actualizada — tu código de recuperación sigue sirviendo','ok');
+      } catch(e){ err.textContent = 'La clave actual es incorrecta'; }
+      return;
+    }
+
+    // formato v1 (sin sobres): se re-cifra la bóveda completa con la clave nueva
+    try {
+      const k = await deriveKey(oldp, unb64(raw.salt), raw.iterations);
+      await decryptObj(k, raw.vault);
+    } catch(e){ err.textContent = 'La clave actual es incorrecta'; return; }
+    try {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      state.key = await deriveKey(np, salt, PBKDF2_ITER);
+      state.meta = { version:1, salt:b64(salt), iterations:PBKDF2_ITER };
+      await persist();
+      closePanel();
+      toast('Clave maestra actualizada','ok');
+    } catch(e){ err.textContent = 'No se pudo actualizar'; }
+  };
+  openPanel(p);
+}
+
+/* activar (v1 → v2) o regenerar (v2) el código de 24 palabras — en ambos casos hace
+   falta volver a escribir la clave maestra actual, y el resultado se muestra una vez */
+function openRecoveryAction(isV2){
+  const p = panelShell(isV2 ? 'Generar un código nuevo' : 'Activar código de recuperación');
+  p.querySelector('.side-panel-head').insertAdjacentHTML('afterbegin',
+    '<button class="icon-btn" id="rc-back" title="Volver"><i class="ph ph-arrow-left"></i></button>');
+  p.querySelector('#rc-back').onclick = () => openSettings();
+  const body = p.querySelector('#panel-body');
+  body.innerHTML = `
+    <div style="font-size:12.5px;color:var(--md);line-height:1.6">
+      ${isV2 ? 'Se genera una frase nueva de 24 palabras. La que tienes ahora deja de servir de inmediato.'
+             : 'Se crea un código de 24 palabras que abre tu bóveda igual que la clave maestra, por si algún día la olvidas.'}
+    </div>
+    <label style="display:block;font-size:11.5px;color:var(--ft);margin:14px 0 6px">Confirma tu clave maestra</label>
+    <input type="password" class="inp inp-mono" id="rc-pw" autocomplete="off">
+    <div class="err" id="rc-err"></div>
+    <button class="btn primary" id="rc-go" style="width:100%;margin-top:10px;padding:10px">${isV2 ? 'Generar código nuevo' : 'Activar código de recuperación'}</button>`;
+  body.querySelector('#rc-go').onclick = async () => {
+    const err = body.querySelector('#rc-err');
+    const pw = body.querySelector('#rc-pw').value;
+    err.textContent = '';
+    if (!pw){ err.textContent = 'Escribe tu clave maestra'; return; }
+    try {
+      if (isV2){
+        const frase = await regenerarFrase(pw);
+        closePanel();
+        renderRecoveryScreenOverlay(frase);
+      } else {
+        const { frase, llave, meta } = await activarRecuperacion(pw);
+        state.key = llave; state.meta = meta;
+        closePanel();
+        renderRecoveryScreenOverlay(frase);
+      }
+    } catch(e){ err.textContent = 'La clave actual es incorrecta'; }
+  };
+  openPanel(p);
+}
+/* muestra el código de 24 palabras como panel, sin salir de la app (a diferencia de
+   la pantalla de creación, aquí la bóveda ya estaba abierta) */
+function renderRecoveryScreenOverlay(frase){
+  const p = panelShell('Tu código de recuperación');
+  const body = p.querySelector('#panel-body');
+  body.innerHTML = `
+    <div class="hint-box">
+      <i class="ph-fill ph-warning" style="color:var(--red);font-size:16px"></i>
+      <div>Guárdalo ahora — no se puede volver a mostrar. Cualquiera con estas 24 palabras abre tu bóveda.</div>
+    </div>
+    <div id="rec-words" style="margin-top:14px;background:rgba(10,15,11,.5);border:1px solid var(--ln);border-radius:10px;padding:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px"></div>
+    <div style="display:flex;gap:7px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn sm" id="rec-copy"><i class="ph ph-copy"></i>Copiar</button>
+      <button class="btn sm" id="rec-txt"><i class="ph ph-download-simple"></i><span>Descargar .txt</span></button>
+      <button class="btn sm" id="rec-print"><i class="ph ph-printer"></i>Imprimir</button>
+    </div>`;
+  const foot = panelFoot(p);
+  foot.innerHTML = `<button class="btn primary" id="rec-done" style="width:100%">Ya lo guardé</button>`;
+  const wordsBox = body.querySelector('#rec-words');
+  frase.split(' ').forEach((w,i) => {
+    wordsBox.appendChild(el('div', null,
+      `<span style="color:var(--ft);width:15px;display:inline-block;text-align:right;font-family:var(--mono);font-size:12.5px;font-feature-settings:'tnum'">${i+1}</span> <span style="font-family:var(--mono);font-size:12.5px">${escapeHtml(w)}</span>`));
+  });
+  body.querySelector('#rec-copy').onclick = () => copy(frase, 'Código copiado');
+  body.querySelector('#rec-txt').onclick = () => download('boveda-codigo-recuperacion.txt',
+    'BÓVEDA — código de recuperación\nGenerado el ' + formatDate(Date.now()) + '\n\n' + frase + '\n', 'text/plain');
+  body.querySelector('#rec-print').onclick = () => window.print();
+  foot.querySelector('#rec-done').onclick = () => { closePanel(); toast('Código de recuperación actualizado','ok'); };
+  openPanel(p);
+}
+
+/* ====================  CSV  ==================== */
+function detectDelim(line){
+  return (line.split(';').length > line.split(',').length) ? ';' : ',';
+}
+function parseCSV(text, delim){
+  const rows = []; let row = [], field = '', q = false;
+  text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1]==='"'){ field+='"'; i++; } else q=false; }
+      else field += c;
+    } else {
+      if (c === '"') q = true;
+      else if (c === delim){ row.push(field); field=''; }
+      else if (c === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ''));
+}
+function norm(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+const HEADERS = {
+  service:['servicio','sitio','cuenta','nombre','service','site','app','plataforma','web'],
+  username:['correo','email','e-mail','usuario','user','login','mail'],
+  password:['contrasena','contrasena','clave','password','pass','pwd','contraseña'],
+  twofa:['2fa','autenticador','authenticator','mfa','doble factor','verificacion','2 pasos'],
+  url:['url','enlace','link','direccion'],
+  notes:['notas','nota','comentario','observaciones','notes','comentarios'],
+};
+function matchHeader(cell){
+  const n = norm(cell);
+  for (const [field,keys] of Object.entries(HEADERS))
+    if (keys.some(k => n === k || n.includes(k))) return field;
+  return null;
+}
+function truthy2fa(v){
+  const n = norm(v);
+  if (!n) return false;
+  return !['no','false','0','n','ninguno','-'].includes(n);
+}
+function importFromCSV(text){
+  const firstLine = text.split('\n')[0] || '';
+  const delim = detectDelim(firstLine);
+  const rows = parseCSV(text, delim);
+  if (!rows.length) return [];
+  // ¿la primera fila es encabezado?
+  const headerMap = {};
+  let hasHeader = false;
+  rows[0].forEach((cell,idx) => {
+    const f = matchHeader(cell);
+    if (f && !(f in headerMap)){ headerMap[f] = idx; hasHeader = true; }
+  });
+  const out = [];
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const map = hasHeader ? headerMap : { service:0, username:1, password:2, twofa:3 };
+  for (const r of dataRows){
+    const get = (f) => (map[f] != null && r[map[f]] != null) ? r[map[f]].trim() : '';
+    const service = get('service');
+    const username = get('username');
+    const password = get('password');
+    if (!service && !username && !password) continue;
+    out.push({
+      service: service || username || 'Cuenta',
+      username, password,
+      url: get('url'),
+      has2FA: truthy2fa(get('twofa')),
+      twoFAType: (()=>{ const v = get('twofa'); const n = norm(v);
+        return (n && !['si','sí','x','1','true','yes'].includes(n) && truthy2fa(v)) ? v.trim() : ''; })(),
+      notes: get('notes'),
+      history: [],
+      logo: '',
+    });
+  }
+  return out;
+}
+function csvCell(v){
+  v = (v==null) ? '' : String(v);
+  return /[",;\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+}
+function exportToCSV(){
+  const head = ['servicio','correo_usuario','contraseña','2fa','tipo_2fa','url','notas'];
+  const lines = [head.join(',')];
+  for (const e of state.entries){
+    lines.push([e.service,e.username,e.password,e.has2FA?'si':'no',e.twoFAType,e.url,e.notes].map(csvCell).join(','));
+  }
+  return lines.join('\n');
+}
+
+/* ====================  HELPERS  ==================== */
+function download(name, content, type){
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = el('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+function dateStamp(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function escapeHtml(s){
+  return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
+function escapeAttr(s){
+  return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+/* ====================  ARRANQUE  ==================== */
+(async function init(){
+  if (!(await storageAvailable())){
+    $('root').innerHTML = `<div class="wrap"><div class="centered"><div class="auth-card glass" style="max-width:392px;text-align:center">
+      ${LOGO_SVG(34)}
+      <div class="auth-title" style="margin-top:14px">Bóveda</div>
+      <div class="auth-sub" style="margin-top:8px">Este entorno no permite almacenamiento persistente. Ábrelo dentro de Claude para que tus datos se guarden.</div>
+    </div></div></div>`;
+    return;
+  }
+  if (!crypto || !crypto.subtle){
+    $('root').innerHTML = `<div class="wrap"><div class="centered"><div class="auth-card glass" style="max-width:392px;text-align:center">
+      <div class="auth-sub">Tu navegador no soporta el cifrado necesario.</div>
+    </div></div></div>`;
+    return;
+  }
+  renderLock();
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>

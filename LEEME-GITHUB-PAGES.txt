@@ -1,0 +1,82 @@
+============================================================
+  BOVEDA - VERSION PARA CELULAR (PWA)
+============================================================
+
+Esta carpeta es una version de Boveda que corre en el navegador
+de tu telefono. El codigo (esta carpeta) va a quedar publico en
+GitHub, pero tus contrasenas NUNCA se suben ahi - se cifran y
+se guardan solamente en el almacenamiento de tu propio telefono
+(localStorage del navegador), igual que la version de escritorio
+guarda su archivo en tu computadora.
+
+Esta bóveda del celular es SEPARADA de la de tu compu. Si querés
+las mismas cuentas en los dos lados, usá "Ajustes -> Respaldo
+cifrado" para exportar de un lado e importar del otro a mano.
+
+============================================================
+  PASO 1 - Crear el repositorio en GitHub
+============================================================
+
+1. Entra a https://github.com y creá una cuenta si no tenés.
+2. Arriba a la derecha, click en el "+" -> "New repository".
+3. Nombre del repositorio: boveda-celular (o el que quieras).
+4. Dejalo en "Public" (tiene que ser publico para que GitHub
+   Pages sea gratis). Recorda: publico es el PROGRAMA, no tus
+   contrasenas.
+5. Click en "Create repository".
+
+============================================================
+  PASO 2 - Subir estos archivos
+============================================================
+
+En la pagina del repositorio recien creado:
+
+1. Click en "uploading an existing file" (o el boton
+   "Add file" -> "Upload files").
+2. Arrastra TODO el contenido de esta carpeta "pwa" (no la
+   carpeta en si, sino lo que esta adentro):
+     - index.html
+     - manifest.webmanifest
+     - sw.js
+     - la carpeta icons/ completa
+3. Click en "Commit changes".
+
+============================================================
+  PASO 3 - Activar GitHub Pages
+============================================================
+
+1. En el repositorio, andá a "Settings" (arriba).
+2. En el menu de la izquierda, click en "Pages".
+3. Donde dice "Source", elegí "Deploy from a branch".
+4. Branch: "main", carpeta "/ (root)". Click en "Save".
+5. Esperá 1-2 minutos y recargá la pagina de Settings -> Pages.
+   Ahi va a aparecer tu direccion, algo como:
+
+     https://tu-usuario.github.io/boveda-celular/
+
+============================================================
+  PASO 4 - Instalarla en el celular
+============================================================
+
+1. Abrí esa direccion en el navegador de tu telefono (Chrome
+   en Android, Safari en iPhone).
+2. Anda a crear tu boveda la primera vez - es una bóveda NUEVA,
+   vacia, separada de la de tu compu (ver la nota arriba).
+3. Para que quede como un icono de app:
+   - Android (Chrome): menu (los 3 puntitos) -> "Instalar app"
+     o "Agregar a pantalla de inicio".
+   - iPhone (Safari): boton de compartir (el cuadrado con la
+     flecha) -> "Agregar a pantalla de inicio".
+4. Te va a quedar un icono de Boveda en tu telefono que abre
+   la app directo, sin la barra del navegador, y funciona sin
+   internet despues de la primera vez que la abras.
+
+============================================================
+  ACTUALIZAR MAS ADELANTE
+============================================================
+
+Si en el futuro te mando una version nueva de esta carpeta,
+el proceso es: subir (Paso 2) los archivos nuevos reemplazando
+los viejos en el mismo repositorio. GitHub Pages se actualiza
+solo en un minuto. Tus contrasenas guardadas en el telefono no
+se tocan - viven en el navegador, no en el repositorio.
