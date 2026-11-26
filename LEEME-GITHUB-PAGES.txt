@@ -2,6 +2,11 @@
   BOVEDA - VERSION PARA CELULAR (PWA)
 ============================================================
 
+Version actual: 1.4 (igual que la de escritorio: generador
+arreglado, lista que no salta, boton de Filtraciones arriba).
+Las fuentes y los iconos vienen incluidos en vendor/, asi que
+la app abre completa sin internet.
+
 Esta carpeta es una version de Boveda que corre en el navegador
 de tu telefono. El codigo (esta carpeta) va a quedar publico en
 GitHub, pero tus contrasenas NUNCA se suben ahi - se cifran y
